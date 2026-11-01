@@ -5,12 +5,12 @@ on:
       java-version:
         description: "Target Java toolchain version ('all', '17', or '21')"
         required: false
-        default: "21"
+        default: "all"
         type: "choice"
         options:
+          - "all"
           - "21"
           - "17"
-          - "all"
       system-test-target:
         description: "System test target ('deployment', 'image', or 'all')"
         required: false
@@ -28,7 +28,7 @@ permissions:
 jobs:
   run-system-tests:
     name: "Java ${{ matrix.java.version}}"
-    if: (github.repository == 'sajuptpm/spring-boot' || github.repository == 'spring-projects/spring-boot') && (inputs.java-version == null || inputs.java-version == 'all' || inputs.java-version == matrix.java.version)
+    if: ${{ github.repository == 'sajuptpm/spring-boot' || github.repository == 'spring-projects/spring-boot' }}
     runs-on: ${{ vars.UBUNTU_MEDIUM || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
@@ -40,19 +40,23 @@ jobs:
             toolchain: true
     steps:
       - name: Switch Docker to Overlay2
+        if: ${{ inputs.java-version == null || inputs.java-version == 'all' || inputs.java-version == matrix.java.version }}
         shell: bash
         run: |
           echo '{"storage-driver":"overlay2"}' | sudo tee /etc/docker/daemon.json
           sudo systemctl restart docker
       - name: Check Out Code
+        if: ${{ inputs.java-version == null || inputs.java-version == 'all' || inputs.java-version == matrix.java.version }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Prepare Gradle Build
+        if: ${{ inputs.java-version == null || inputs.java-version == 'all' || inputs.java-version == matrix.java.version }}
         uses: ./.github/actions/prepare-gradle-build
         with:
           develocity-access-key: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
           java-toolchain: ${{ matrix.java.toolchain }}
           java-version: ${{ matrix.java.version }}
       - name: Run System Tests
+        if: ${{ inputs.java-version == null || inputs.java-version == 'all' || inputs.java-version == matrix.java.version }}
         id: run-system-tests
         shell: bash
         run: |
@@ -71,15 +75,15 @@ jobs:
           echo "Executing system test task: ./gradlew $TASK"
           ./gradlew $TASK
       - name: Show docker info
-        if: always()
+        if: ${{ (inputs.java-version == null || inputs.java-version == 'all' || inputs.java-version == matrix.java.version) && always() }}
         shell: bash
         run: docker version ; docker info
       - name: List docker images
-        if: always()
+        if: ${{ (inputs.java-version == null || inputs.java-version == 'all' || inputs.java-version == matrix.java.version) && always() }}
         shell: bash
         run: docker image ls --digests
       - name: Record Job Summary
-        if: always()
+        if: ${{ (inputs.java-version == null || inputs.java-version == 'all' || inputs.java-version == matrix.java.version) && always() }}
         shell: bash
         run: |
           echo "### System Tests – Java ${{ matrix.java.version }}" >> $GITHUB_STEP_SUMMARY
@@ -92,14 +96,14 @@ jobs:
           echo "| **Commit** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Workflow Run** | [View Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |" >> $GITHUB_STEP_SUMMARY
       - name: Upload Test Reports
-        if: always()
+        if: ${{ (inputs.java-version == null || inputs.java-version == 'all' || inputs.java-version == matrix.java.version) && always() }}
         uses: actions/upload-artifact@v4
         with:
           name: "system-test-reports-java-${{ matrix.java.version }}"
           path: "**/build/reports"
           if-no-files-found: ignore
       - name: Send Notification
-        if: always() && secrets.GOOGLE_CHAT_WEBHOOK_URL != ''
+        if: ${{ (inputs.java-version == null || inputs.java-version == 'all' || inputs.java-version == matrix.java.version) && always() }}
         uses: ./.github/actions/send-notification
         with:
           build-scan-url: ${{ steps.run-system-tests.outputs.build-scan-url }}
