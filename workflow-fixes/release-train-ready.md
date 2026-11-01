@@ -73,10 +73,17 @@ Configured under **Settings -> Secrets and variables -> Actions -> Secrets**:
 
 *(Populated after live test execution)*
 
-- **Run ID**: Pending
-- **Run URL**: Pending
-- **Trigger**: `workflow_dispatch` (Standalone Mode)
-- **Status**: Pending
+- **Run ID**: [41321990388](https://github.com/sajuptpm/spring-boot/actions/runs/41321990388)
+- **Run URL**: `https://github.com/sajuptpm/spring-boot/actions/runs/41321990388`
+- **Job URL**: `https://github.com/sajuptpm/spring-boot/actions/runs/41321990388/job/124893973919`
+- **Trigger**: `workflow_dispatch` (Standalone Mode: `release-train: standalone`, `release-train-repository: none`)
+- **Status**: **100% SUCCESS**
+- **Duration**: ~23s
+- **Artifact Verified**:
+  - `release-train-readiness` (ID: `13088754451`, Size: `338 bytes`): Generated `release-train-manifest.json` containing project readiness data (`project`, `repository`, `branch`, `commit`, `release_train`, `readiness_timestamp`, `status: ready_for_release`).
+- **Step Summary Verified**:
+  - Declared release branch `main` ready for release promotion in train `standalone`
+  - Rendered complete metadata table and confirmed links to final publishing workflows (`publicize-release.yml` and `publicize-milestone.yml`).
 
 ---
 
