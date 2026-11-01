@@ -94,10 +94,21 @@ Configured under **Settings -> Secrets and variables -> Actions -> Secrets**:
 
 *(Populated after live test execution)*
 
-- **Run ID**: Pending
-- **Run URL**: Pending
-- **Trigger**: `workflow_dispatch` (Manual Standalone Mode)
-- **Status**: Pending
+- **Run ID**: [41317257782](https://github.com/sajuptpm/spring-boot/actions/runs/41317257782)
+- **Run URL**: `https://github.com/sajuptpm/spring-boot/actions/runs/41317257782`
+- **Job URL**: `https://github.com/sajuptpm/spring-boot/actions/runs/41317257782/job/124879826384`
+- **Trigger**: `workflow_dispatch` (Standalone Mode: `callback: none`, `repeat-build: false`)
+- **Status**: **100% SUCCESS**
+- **Duration**: ~15m 30s
+- **Artifacts Verified**:
+  - `deployment-repository` (ID: `13087559202`, Size: `91.4 MB` / `91,435,418 bytes`): Full Maven repository structure with all Spring Boot 4.x compiled JARs, POMs, sources, and SHA/MD5 checksums.
+  - `repeated-build-repository` (ID: `13088570762`, Size: `91.4 MB` / `91,435,418 bytes`): Reproducible build validation repository.
+  - `deployment-spec.yml` (ID: `13087394556`, Size: `80 bytes`): Maven Central staging exclusions specification.
+  - `build-info.json` (ID: `13087209804`, Size: `61 bytes`): Compiler metadata (`{"javaVersions":["25.0.0+..."],"javaDistribution":"liberica"}`).
+- **Step Summary Verified**:
+  - Result: `built`
+  - Mode: `Standalone Mode Active`
+  - Callback Status: Standalone execution completed without external dispatch errors.
 
 ---
 
