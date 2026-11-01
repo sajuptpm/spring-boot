@@ -91,10 +91,20 @@ Configured under **Settings -> Secrets and variables -> Actions -> Secrets**:
 
 *(Populated after live test execution)*
 
-- **Run ID**: Pending
-- **Run URL**: Pending
-- **Trigger**: `workflow_dispatch` (Standalone Mode)
-- **Status**: Pending
+- **Run ID**: [41323488426](https://github.com/sajuptpm/spring-boot/actions/runs/41323488426)
+- **Run URL**: `https://github.com/sajuptpm/spring-boot/actions/runs/41323488426`
+- **Job URL**: `https://github.com/sajuptpm/spring-boot/actions/runs/41323488426/job/124898459090`
+- **Trigger**: `workflow_dispatch` (Standalone Mode: `callback: none`, `test-scope: smoke`)
+- **Status**: **100% SUCCESS**
+- **Duration**: ~4m 45s
+- **Artifact Verified**:
+  - `build-system-reports` (ID: `13090716966`, Size: `174.7 KB` / `174,733 bytes`): HTML and XML test result reports from `**/build/reports`.
+- **Step Summary Verified**:
+  - Result: `tested`
+  - Mode: `Standalone Mode Active`
+  - Test Scope: `smoke`
+  - Executed Tasks: `:smoke-test:spring-boot-smoke-test-simple:test`
+  - Callback Status: Tests verified successfully in repository `sajuptpm/spring-boot`.
 
 ---
 
