@@ -64,7 +64,7 @@ jobs:
         uses: ./.github/actions/prepare-gradle-build
         with:
           cache-read-only: 'false'
-          java-version: '17'
+          java-version: '25'
       - name: Build Gradle Plugin (GitHub Native)
         if: steps.target.outputs.mode == 'github-native'
         shell: bash
@@ -129,7 +129,7 @@ jobs:
         uses: ./.github/actions/prepare-gradle-build
         with:
           cache-read-only: 'false'
-          java-version: '17'
+          java-version: '25'
       - name: Package Spring Boot CLI Binary (GitHub Native)
         if: steps.sdkman-target.outputs.mode == 'github-native'
         shell: bash
