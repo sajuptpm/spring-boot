@@ -58,7 +58,6 @@ on:
           - 'original'
 permissions:
   contents: read
-  actions: write
 jobs:
   verify:
     name: Verify
