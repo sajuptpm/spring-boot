@@ -24,15 +24,15 @@
 | **Artifactory Deploy** | Executed unconditionally against `https://repo.spring.io`. | Only executes if `secrets.ARTIFACTORY_USERNAME` (or commercial username) is provided. Supports custom Artifactory URLs via `vars.ARTIFACTORY_DEPLOY_REPO_URL`. |
 | **GitHub Release Deploy (ACTIVE)** | Did not exist. | **Added**: When Artifactory credentials are not configured, automatically packages `deployment-repository/` into `spring-boot-<version>-snapshot.zip` and publishes a GitHub Pre-Release with the ZIP attached. |
 | **Workflow Artifact Upload** | Did not exist. | **Added**: Also uploads `spring-boot-<version>-snapshot.zip` as a downloadable GitHub Actions artifact (14-day retention). |
-| **Google Chat Notification** | Executed unconditionally on completion. | Guarded with `if: always() && secrets.GOOGLE_CHAT_WEBHOOK_URL != ''`. |
+| **Google Chat Notification** | Executed unconditionally on completion. | Guarded with `steps.deploy-config.outputs.has_notification == 'true'`. |
 | **Trigger Docs Build** | Executed unconditionally after build. | Guarded with `if: ${{ vars.TRIGGER_DOCS_BUILD == 'true' \|\| github.repository == 'spring-projects/spring-boot' }}`. |
 | **Verify Job** | Executed unconditionally after build. | Guarded with `if: ${{ vars.ENABLE_VERIFY == 'true' \|\| github.repository == 'spring-projects/spring-boot' }}`. |
 
 ---
 
-## 3. Comparison of the 4 Snapshot Deployment Options
+## 3. Existing Solutions & Free Alternatives Analysis
 
-Below is a detailed comparison of the 4 storage options for snapshot builds in your fork:
+### A. Artifact / Snapshot Deployment (Artifactory vs. Alternatives)
 
 | Feature | Option 1: GitHub Releases *(Active)* | Option 2: GitHub Actions Artifacts | Option 3: Free JFrog Artifactory Cloud | Option 4: GitHub Packages (Maven) |
 | :--- | :--- | :--- | :--- | :--- |
@@ -43,6 +43,17 @@ Below is a detailed comparison of the 4 storage options for snapshot builds in y
 | **Retention / Expiry** | Permanent until deleted | 14 to 90 days (default 14 days) | Permanent within 2GB storage quota | Permanent within storage quota |
 | **Pros** | - Zero external dependencies<br>- Permanent versioned downloads<br>- Release notes linked to commit | - Zero external dependencies<br>- Clean and automatic<br>- No git tags created | - 100% identical to upstream Spring Boot setup<br>- Direct `mvn` and Gradle dependency resolution | - Hosted natively on GitHub<br>- Supports `mvn` and Gradle dependency resolution |
 | **Cons** | - Creates a git tag/release per build run<br>- Other projects cannot consume via `dependencies { ... }` block without unzipping | - Artifacts expire after 14 days<br>- Not visible on repository homepage | - Requires creating and managing an external JFrog account | - Consumer projects need a GitHub token with `read:packages` permission |
+
+---
+
+### B. Build Observability & Caching (Gradle Develocity vs. Alternatives)
+
+| Solution | Provider | Cost | Tokens / Accounts Required | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **Upstream Solution (`ge.spring.io`)** | Gradle Inc. (Hosted for Broadcom) | Paid / Private | Broadcom internal key | Private Develocity instance restricted to `spring-projects/*`. |
+| **Alternative 1: GitHub-Native Job Summary & Artifacts** *(Active)* | **GitHub** | **100% Free** | **None** (Built into GitHub) | `gradle/actions/setup-gradle` automatically generates a **Job Summary** on the Actions run page with build duration, cache hits, and Gradle version. Test reports are uploaded on failure. |
+| **Alternative 2: Public Gradle Build Scans (`scans.gradle.com`)** | **Gradle Inc.** | **100% Free** | **None** | Generates a free, shareable web link (e.g., `https://gradle.com/s/xyz123`) in the build log with complete task execution times and dependency trees. |
+| **Alternative 3: Develocity Free Cloud / Trial** | **Gradle Inc.** | Free for eligible OSS | Requires registration at [gradle.com/develocity](https://gradle.com/develocity/) | Dedicated cloud instance (`https://<your-org>.develocity.com`) with team dashboards and private build scans. |
 
 ---
 
@@ -112,7 +123,7 @@ GitHub Packages hosts Maven packages at `https://maven.pkg.github.com/sajuptpm/s
 | `ARTIFACTORY_PASSWORD` | **No** (leave blank) | **Yes** | Identity Token or password for JFrog / Maven repository. |
 | `GPG_PRIVATE_KEY` | Optional | Optional | PGP private key for artifact signing. |
 | `GPG_PASSPHRASE` | Optional | Optional | Passphrase for PGP private key. |
-| `DEVELOCITY_ACCESS_KEY` | Optional | Optional | Access key for Gradle Develocity (`ge.spring.io`). |
+| `DEVELOCITY_ACCESS_KEY` | Optional | Optional | Access key for Gradle Develocity (`ge.spring.io` or your custom Develocity instance). |
 | `GOOGLE_CHAT_WEBHOOK_URL` | Optional | Optional | Google Chat incoming webhook URL for notifications. |
 | `GH_ACTIONS_REPO_TOKEN` | Optional | Optional | PAT for release verification (only if `ENABLE_VERIFY=true`). |
 
@@ -143,14 +154,11 @@ GitHub Packages hosts Maven packages at `https://maven.pkg.github.com/sajuptpm/s
 
 ## 6. How to Run the Workflow
 
-1. Commit and push the updated workflow to `main`:
+1. Trigger it manually using the provided Python utility:
    ```bash
-   git add .github/workflows/build-and-deploy-snapshot.yml workflow-fixes/
-   git commit -m "Configure build-and-deploy-snapshot workflow for forked repo"
-   git push origin main
+   python workflow-fixes/trigger-workflow.py build-and-deploy-snapshot.yml main
    ```
-2. Pushing to `main` will automatically trigger the workflow.
-3. Or trigger it manually:
+2. Or trigger it via GitHub Web UI:
    - Go to `https://github.com/sajuptpm/spring-boot/actions/workflows/build-and-deploy-snapshot.yml`.
    - Click **Run workflow** -> Select `main` -> Click **Run workflow**.
-4. Once completed, your snapshot artifacts will appear under **Releases** at `https://github.com/sajuptpm/spring-boot/releases` and under the run's **Artifacts** section.
+3. Once completed, your snapshot artifacts will appear under **Releases** at `https://github.com/sajuptpm/spring-boot/releases` and under the run's **Artifacts** section.

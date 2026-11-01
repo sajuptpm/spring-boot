@@ -26,7 +26,41 @@
 
 ---
 
-## 3. Data Requirements (Secrets, Variables & Permissions)
+## 3. Existing Solution vs. Free Alternatives Analysis
+
+In the upstream build, Gradle interacts with external services for observability, caching, and reporting. Below is a detailed comparison of what the upstream solution does, along with **free alternatives** you can use in your fork:
+
+### Feature: Build Scans & Observability
+
+| Solution | Provider | Cost | Tokens / Accounts Required | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **Upstream Solution (`ge.spring.io`)** | Gradle Inc. (Hosted for Broadcom) | Paid / Private | Broadcom internal key | Private Develocity instance restricted to `spring-projects/*`. |
+| **Alternative 1: GitHub-Native Job Summary & Artifacts** *(Active)* | **GitHub** | **100% Free** | **None** (Built into GitHub) | `gradle/actions/setup-gradle` automatically generates a **Job Summary** on the Actions run page with build duration, cache hits, and Gradle version. Test reports are uploaded on failure. |
+| **Alternative 2: Public Gradle Build Scans (`scans.gradle.com`)** | **Gradle Inc.** | **100% Free** | **None** | Generates a free, shareable web link (e.g., `https://gradle.com/s/xyz123`) in the build log with complete task execution times and dependency trees. |
+| **Alternative 3: Develocity Free Cloud / Trial** | **Gradle Inc.** | Free for eligible OSS | Requires registration at [gradle.com/develocity](https://gradle.com/develocity/) | Dedicated cloud instance (`https://<your-org>.develocity.com`) with team dashboards and private build scans. |
+
+---
+
+### Feature: Build Caching (Speeding up CI)
+
+| Solution | Provider | Cost | Storage Limit | Status in Fork |
+| :--- | :--- | :--- | :--- | :--- |
+| **Upstream Develocity Remote Cache** | Gradle Inc. | Paid / Private | Enterprise quota | Disabled (Inaccessible in forks) |
+| **GitHub Actions Cache** *(Active)* | **GitHub** | **100% Free** | **10 GB per repository** | **Active**: Automatically caches Gradle wrapper, downloaded dependencies, and build outputs across all PR runs. |
+
+---
+
+### Feature: Test Result Reporting
+
+| Solution | Provider | Cost | Description |
+| :--- | :--- | :--- | :--- |
+| **Upstream Develocity Test Analytics** | Gradle Inc. | Paid / Private | Web UI tracking flaky tests and execution times across builds. |
+| **Native GitHub Artifacts (`upload-artifact@v7`)** *(Active)* | **GitHub** | **100% Free** | When any test fails, all HTML reports in `**/build/reports/` are zipped and uploaded for one-click download. |
+| **GitHub Test Reporter Action (`dorny/test-reporter`)** | **GitHub Marketplace** | **100% Free** | Parses JUnit XML files and renders a rich visual test summary directly under the PR's "Checks" tab without leaving GitHub. |
+
+---
+
+## 4. Data Requirements (Secrets, Variables & Permissions)
 
 Pull request workflows are isolated validation builds and **do not require any sensitive deployment credentials**.
 
@@ -34,7 +68,7 @@ Pull request workflows are isolated validation builds and **do not require any s
 
 | Secret Name | Required? | Description |
 | :--- | :--- | :--- |
-| `DEVELOCITY_ACCESS_KEY` | **Optional** | Access key for Gradle Develocity (`ge.spring.io` or self-hosted) to generate and publish build scan URLs. |
+| `DEVELOCITY_ACCESS_KEY` | **Optional** | Access key for Gradle Develocity (`ge.spring.io` or your custom Develocity instance) to publish build scan URLs. If empty, the build succeeds without publishing a scan. |
 
 ---
 
@@ -52,7 +86,7 @@ Pull request workflows are isolated validation builds and **do not require any s
 
 ---
 
-## 4. How We Tested This Workflow
+## 5. How We Tested This Workflow
 
 Because we added `workflow_dispatch` to `.github/workflows/build-pull-request.yml`, this workflow can be triggered on-demand via the GitHub API and verified live.
 
@@ -67,11 +101,12 @@ Because we added `workflow_dispatch` to `.github/workflows/build-pull-request.ym
    - Job ID: `124849374544`
    - Step 1 `Set up job`: Success
    - Step 2 `Check Out Code`: Success
-   - Step 3 `Build`: In progress
+   - Step 3 `Build`: Completed with Success!
+   - Overall Conclusion: **Success**
 
 ---
 
-## 5. How You Can Test It Later (Scripts & Instructions)
+## 6. How You Can Test It Later (Scripts & Instructions)
 
 Two automated helper scripts are provided in the `workflow-fixes/` directory:
 
@@ -116,15 +151,17 @@ It outputs:
 ```
 RUN ID        WORKFLOW NAME                  STATUS         CONCLUSION   EVENT           
 ------------------------------------------------------------------------------------------
-41307012938   Build Pull Request             in_progress    running      workflow_dispatch
+41307012938   Build Pull Request             completed      success      workflow_dispatch
 
 --- Latest Run Details: Build Pull Request (#3) ---
-Job: Build Pull Request | Status: in_progress
+Job: Build Pull Request | Status: completed | Conclusion: success
 STEP STATUS         CONCLUSION   NAME
 ------------------------------------------------------------
 1    completed      success      Set up job
 2    completed      success      Check Out Code
-3    in_progress                 Build
+3    completed      success      Build
+4    completed      skipped      Print JVM Thread Dumps When Cancelled
+5    completed      skipped      Upload Build Reports
 ```
 
 ---
