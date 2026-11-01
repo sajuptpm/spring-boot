@@ -36,17 +36,18 @@ runs:
         GITHUB_TOKEN: ${{ inputs.token }}
       run: |
         TAG="v${{ inputs.milestone }}"
-        EXTRA_FLAGS=""
-        if [ "${{ inputs.pre-release }}" = "true" ]; then
-          EXTRA_FLAGS="--prerelease"
-        else
-          EXTRA_FLAGS="--latest=${{ inputs.latest }}"
-        fi
-
         if gh release view "$TAG" >/dev/null 2>&1; then
-          echo "Release $TAG already exists. Updating release notes..."
-          gh release edit "$TAG" --notes-file changelog.md $EXTRA_FLAGS
+          echo "Release $TAG already exists. Updating release..."
+          if [ "${{ inputs.pre-release }}" = "true" ]; then
+            gh release edit "$TAG" --notes-file changelog.md --prerelease
+          else
+            gh release edit "$TAG" --notes-file changelog.md --prerelease=false --latest="${{ inputs.latest }}"
+          fi
         else
           echo "Release $TAG does not exist. Creating release..."
-          gh release create "$TAG" --verify-tag --notes-file changelog.md $EXTRA_FLAGS
+          if [ "${{ inputs.pre-release }}" = "true" ]; then
+            gh release create "$TAG" --verify-tag --notes-file changelog.md --prerelease
+          else
+            gh release create "$TAG" --verify-tag --notes-file changelog.md --latest="${{ inputs.latest }}"
+          fi
         fi
