@@ -18,6 +18,27 @@ jobs:
     steps:
       - name: Check Out Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Configure Deployment Target
+        id: deploy-config
+        shell: bash
+        env:
+          ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
+          COMMERCIAL_ARTIFACTORY_USERNAME: ${{ secrets.COMMERCIAL_ARTIFACTORY_USERNAME }}
+          GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
+        run: |
+          if [ "${{ vars.COMMERCIAL }}" = "true" ] && [ -n "$COMMERCIAL_ARTIFACTORY_USERNAME" ]; then
+            echo "has_artifactory=true" >> "$GITHUB_OUTPUT"
+          elif [ -n "$ARTIFACTORY_USERNAME" ]; then
+            echo "has_artifactory=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_artifactory=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if [ -n "$GOOGLE_CHAT_WEBHOOK_URL" ]; then
+            echo "has_notification=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_notification=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Build and Publish
         id: build-and-publish
         uses: ./.github/actions/build
@@ -30,7 +51,7 @@ jobs:
           gradle-cache-read-only: false
           publish: true
       - name: Deploy to Artifactory
-        if: ${{ (vars.COMMERCIAL && secrets.COMMERCIAL_ARTIFACTORY_USERNAME != '') || secrets.ARTIFACTORY_USERNAME != '' }}
+        if: steps.deploy-config.outputs.has_artifactory == 'true'
         uses: spring-io/artifactory-deploy-action@9cb1c7df78cd8d1223de1dde974819fa6378af9f # v0.0.6
         with:
           build-name: ${{ vars.COMMERCIAL && format('spring-boot-commercial-{0}', '4.2.x') || format('spring-boot-{0}', '4.2.x') }}
@@ -44,14 +65,14 @@ jobs:
           uri: ${{ vars.COMMERCIAL && vars.COMMERCIAL_DEPLOY_REPO_URL || vars.ARTIFACTORY_DEPLOY_REPO_URL || 'https://repo.spring.io' }}
           username: ${{ vars.COMMERCIAL && secrets.COMMERCIAL_ARTIFACTORY_USERNAME || secrets.ARTIFACTORY_USERNAME }}
       - name: Create Snapshot Zip Archive
-        if: ${{ !(vars.COMMERCIAL && secrets.COMMERCIAL_ARTIFACTORY_USERNAME != '') && secrets.ARTIFACTORY_USERNAME == '' }}
+        if: steps.deploy-config.outputs.has_artifactory != 'true'
         shell: bash
         run: |
           version="${{ steps.build-and-publish.outputs.version }}"
           echo "Packaging deployment repository for version $version..."
           zip -r "spring-boot-${version}-snapshot.zip" deployment-repository
       - name: Deploy to GitHub Release
-        if: ${{ !(vars.COMMERCIAL && secrets.COMMERCIAL_ARTIFACTORY_USERNAME != '') && secrets.ARTIFACTORY_USERNAME == '' }}
+        if: steps.deploy-config.outputs.has_artifactory != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
@@ -66,14 +87,14 @@ jobs:
             --notes "Snapshot build artifacts generated from commit ${{ github.sha }} on branch ${{ github.ref_name }}." \
             --prerelease
       - name: Upload Snapshot Artifact
-        if: ${{ !(vars.COMMERCIAL && secrets.COMMERCIAL_ARTIFACTORY_USERNAME != '') && secrets.ARTIFACTORY_USERNAME == '' }}
+        if: steps.deploy-config.outputs.has_artifactory != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: spring-boot-${{ steps.build-and-publish.outputs.version }}-snapshot
           path: spring-boot-${{ steps.build-and-publish.outputs.version }}-snapshot.zip
           retention-days: 14
       - name: Send Notification
-        if: always() && secrets.GOOGLE_CHAT_WEBHOOK_URL != ''
+        if: always() && steps.deploy-config.outputs.has_notification == 'true'
         uses: ./.github/actions/send-notification
         with:
           build-scan-url: ${{ steps.build-and-publish.outputs.build-scan-url }}
