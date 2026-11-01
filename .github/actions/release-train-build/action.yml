@@ -4,4 +4,23 @@ runs:
   steps:
     - name: Build Release
       shell: bash
-      run:  ./gradlew --no-build-cache -PdeploymentRepository=$(pwd)/deployment-repository publishAllPublicationsToDeploymentRepository
+      run: |
+        if [ -z "$RELEASE_TRAIN_MAVEN_REPOSITORY_URL" ]; then
+          unset RELEASE_TRAIN_MAVEN_REPOSITORY_URL
+        fi
+        if [ -z "$COMMERCIAL_RELEASE_REPO_URL" ]; then
+          unset COMMERCIAL_RELEASE_REPO_URL
+        fi
+        if [ -z "$RELEASE_TRAIN_MAVEN_REPOSITORY_USERNAME" ]; then
+          unset RELEASE_TRAIN_MAVEN_REPOSITORY_USERNAME
+        fi
+        if [ -z "$RELEASE_TRAIN_MAVEN_REPOSITORY_PASSWORD" ]; then
+          unset RELEASE_TRAIN_MAVEN_REPOSITORY_PASSWORD
+        fi
+        if [ -z "$COMMERCIAL_REPO_USERNAME" ]; then
+          unset COMMERCIAL_REPO_USERNAME
+        fi
+        if [ -z "$COMMERCIAL_REPO_PASSWORD" ]; then
+          unset COMMERCIAL_REPO_PASSWORD
+        fi
+        ./gradlew --no-build-cache -PdeploymentRepository=$(pwd)/deployment-repository publishAllPublicationsToDeploymentRepository
