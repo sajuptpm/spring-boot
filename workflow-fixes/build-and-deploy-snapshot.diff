@@ -1,7 +1,20 @@
 diff --git a/.github/workflows/build-and-deploy-snapshot.yml b/.github/workflows/build-and-deploy-snapshot.yml
-index ae30750749b..f89d966ead5 100644
+index ae30750749b..65494d32de9 100644
 --- a/.github/workflows/build-and-deploy-snapshot.yml
 +++ b/.github/workflows/build-and-deploy-snapshot.yml
+@@ -1,9 +1,9 @@
+ name: Build and Deploy Snapshot
+ on:
+   workflow_dispatch:
+-  push:
+-    branches:
+-      - 'main'
++#  push:
++#    branches:
++#      - 'main'
+ permissions:
+   contents: read
+ concurrency:
 @@ -11,11 +11,34 @@ concurrency:
  jobs:
    build-and-deploy-snapshot:
@@ -44,7 +57,7 @@ index ae30750749b..f89d966ead5 100644
            publish: true
 -      - name: Deploy
 +      - name: Deploy to Artifactory
-+        if: steps.deploy-config.outputs.has_artifactory == 'true'
+         if: steps.deploy-config.outputs.has_artifactory == 'true'
          uses: spring-io/artifactory-deploy-action@9cb1c7df78cd8d1223de1dde974819fa6378af9f # v0.0.6
          with:
            build-name: ${{ vars.COMMERCIAL && format('spring-boot-commercial-{0}', '4.2.x') || format('spring-boot-{0}', '4.2.x') }}
@@ -62,8 +75,8 @@ index ae30750749b..f89d966ead5 100644
            username: ${{ vars.COMMERCIAL && secrets.COMMERCIAL_ARTIFACTORY_USERNAME || secrets.ARTIFACTORY_USERNAME }}
 +      - name: Create Snapshot Zip Archive
 +        if: steps.deploy-config.outputs.has_artifactory != 'true'
-+        shell: bash
-+        run: |
+         shell: bash
+         run: |
 +          version="${{ steps.build-and-publish.outputs.version }}"
 +          echo "Packaging deployment repository for version $version..."
 +          zip -r "spring-boot-${version}-snapshot.zip" deployment-repository
@@ -84,11 +97,11 @@ index ae30750749b..f89d966ead5 100644
 +            --prerelease
 +      - name: Upload Snapshot Artifact
 +        if: steps.deploy-config.outputs.has_artifactory != 'true'
-+        uses: actions/upload-artifact@v4
-+        with:
-+          name: spring-boot-${{ steps.build-and-publish.outputs.version }}-snapshot
-+          path: spring-boot-${{ steps.build-and-publish.outputs.version }}-snapshot.zip
-+          retention-days: 14
+         uses: actions/upload-artifact@v4
+         with:
+           name: spring-boot-${{ steps.build-and-publish.outputs.version }}-snapshot
+           path: spring-boot-${{ steps.build-and-publish.outputs.version }}-snapshot.zip
+           retention-days: 14
        - name: Send Notification
 -        if: always()
 +        if: always() && steps.deploy-config.outputs.has_notification == 'true'
