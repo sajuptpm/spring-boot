@@ -42,3 +42,7 @@ secrets.yml
 .git-hooks/
 node_modules
 /.kotlin/
+
+# Local credentials and workflow environments
+*.env
+workflow-fixes/*.env

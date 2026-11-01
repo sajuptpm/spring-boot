@@ -11,8 +11,10 @@ concurrency:
 jobs:
   build-and-deploy-snapshot:
     name: Build and Deploy Snapshot
-    if: ${{ github.repository == 'spring-projects/spring-boot' || github.repository == 'spring-projects/spring-boot-commercial' }}
+    if: ${{ github.repository == 'sajuptpm/spring-boot' || github.repository == 'spring-projects/spring-boot' || github.repository == 'spring-projects/spring-boot-commercial' || vars.ENABLE_SNAPSHOT_BUILD == 'true' }}
     runs-on: ${{ vars.UBUNTU_MEDIUM || 'ubuntu-latest' }}
+    permissions:
+      contents: write
     steps:
       - name: Check Out Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -27,21 +29,51 @@ jobs:
           develocity-access-key: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
           gradle-cache-read-only: false
           publish: true
-      - name: Deploy
+      - name: Deploy to Artifactory
+        if: ${{ (vars.COMMERCIAL && secrets.COMMERCIAL_ARTIFACTORY_USERNAME != '') || secrets.ARTIFACTORY_USERNAME != '' }}
         uses: spring-io/artifactory-deploy-action@9cb1c7df78cd8d1223de1dde974819fa6378af9f # v0.0.6
         with:
           build-name: ${{ vars.COMMERCIAL && format('spring-boot-commercial-{0}', '4.2.x') || format('spring-boot-{0}', '4.2.x') }}
           folder: 'deployment-repository'
           password: ${{ vars.COMMERCIAL && secrets.COMMERCIAL_ARTIFACTORY_PASSWORD || secrets.ARTIFACTORY_PASSWORD }}
-          project: ${{ vars.COMMERCIAL && 'spring' }}
-          repository: ${{ vars.COMMERCIAL && 'spring-enterprise-maven-dev-local' || 'libs-snapshot-local' }}
+          project: ${{ vars.COMMERCIAL && 'spring' || vars.ARTIFACTORY_PROJECT }}
+          repository: ${{ vars.COMMERCIAL && 'spring-enterprise-maven-dev-local' || vars.ARTIFACTORY_REPOSITORY || 'libs-snapshot-local' }}
           signing-key: ${{ secrets.GPG_PRIVATE_KEY }}
           signing-passphrase: ${{ secrets.GPG_PASSPHRASE }}
           threads: 8
-          uri: ${{ vars.COMMERCIAL_DEPLOY_REPO_URL || 'https://repo.spring.io' }}
+          uri: ${{ vars.COMMERCIAL && vars.COMMERCIAL_DEPLOY_REPO_URL || vars.ARTIFACTORY_DEPLOY_REPO_URL || 'https://repo.spring.io' }}
           username: ${{ vars.COMMERCIAL && secrets.COMMERCIAL_ARTIFACTORY_USERNAME || secrets.ARTIFACTORY_USERNAME }}
+      - name: Create Snapshot Zip Archive
+        if: ${{ !(vars.COMMERCIAL && secrets.COMMERCIAL_ARTIFACTORY_USERNAME != '') && secrets.ARTIFACTORY_USERNAME == '' }}
+        shell: bash
+        run: |
+          version="${{ steps.build-and-publish.outputs.version }}"
+          echo "Packaging deployment repository for version $version..."
+          zip -r "spring-boot-${version}-snapshot.zip" deployment-repository
+      - name: Deploy to GitHub Release
+        if: ${{ !(vars.COMMERCIAL && secrets.COMMERCIAL_ARTIFACTORY_USERNAME != '') && secrets.ARTIFACTORY_USERNAME == '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          version="${{ steps.build-and-publish.outputs.version }}"
+          tag_name="v${version}-build.${{ github.run_number }}"
+          echo "Publishing GitHub Pre-release $tag_name..."
+          gh release create "$tag_name" \
+            "spring-boot-${version}-snapshot.zip" \
+            --repo "${{ github.repository }}" \
+            --title "Spring Boot ${version} (Build #${{ github.run_number }})" \
+            --notes "Snapshot build artifacts generated from commit ${{ github.sha }} on branch ${{ github.ref_name }}." \
+            --prerelease
+      - name: Upload Snapshot Artifact
+        if: ${{ !(vars.COMMERCIAL && secrets.COMMERCIAL_ARTIFACTORY_USERNAME != '') && secrets.ARTIFACTORY_USERNAME == '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: spring-boot-${{ steps.build-and-publish.outputs.version }}-snapshot
+          path: spring-boot-${{ steps.build-and-publish.outputs.version }}-snapshot.zip
+          retention-days: 14
       - name: Send Notification
-        if: always()
+        if: always() && secrets.GOOGLE_CHAT_WEBHOOK_URL != ''
         uses: ./.github/actions/send-notification
         with:
           build-scan-url: ${{ steps.build-and-publish.outputs.build-scan-url }}
@@ -53,6 +85,7 @@ jobs:
   trigger-docs-build:
     name: Trigger Docs Build
     needs: build-and-deploy-snapshot
+    if: ${{ vars.TRIGGER_DOCS_BUILD == 'true' || github.repository == 'spring-projects/spring-boot' }}
     permissions:
       actions: write
     runs-on: ${{ vars.UBUNTU_SMALL || 'ubuntu-latest' }}
@@ -64,6 +97,7 @@ jobs:
   verify:
     name: Verify
     needs: build-and-deploy-snapshot
+    if: ${{ vars.ENABLE_VERIFY == 'true' || github.repository == 'spring-projects/spring-boot' }}
     uses: ./.github/workflows/verify.yml
     secrets:
       commercial-repository-password: ${{ secrets.COMMERCIAL_ARTIFACTORY_PASSWORD }}
