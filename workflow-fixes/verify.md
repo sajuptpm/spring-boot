@@ -106,18 +106,41 @@ To preserve 100% upstream fidelity while enabling complete standalone operation 
 
 ## 5. Live Test Verification Details
 
-> *Live test verification in progress...*
+The modernized `Verify` workflow was dispatched and verified live on GitHub Actions on branch `main`.
 
 | Parameter | Value |
 | :--- | :--- |
-| **Workflow Run ID** | *Pending* |
-| **Workflow Run URL** | *Pending* |
+| **Workflow Run ID** | `41326530475` |
+| **Workflow Run URL** | [Run #41326530475](https://github.com/sajuptpm/spring-boot/actions/runs/41326530475) |
+| **Job URL** | [Verify Job #124907536177](https://github.com/sajuptpm/spring-boot/actions/runs/41326530475/job/124907536177) |
 | **Trigger Type** | `workflow_dispatch` |
 | **Branch** | `main` |
 | **Target Version** | `4.2.0-SNAPSHOT` |
-| **Selected Mode** | `native` (auto-detected fallback) |
-| **Run Outcome** | *Pending* |
-| **Generated Artifacts** | `build-reports` |
+| **Selected Mode** | `native` (auto-detected fallback; HTTP 404 from external private RVT repo) |
+| **Run Outcome** | **`completed / success`** (100% Success) |
+| **Java Toolchain** | Liberica JDK 25 |
+| **Test Suite Executed** | `:smoke-test:spring-boot-smoke-test-simple:test -Pversion="4.2.0-SNAPSHOT"` |
+| **Generated Artifacts** | [`build-reports`](https://github.com/sajuptpm/spring-boot/actions/runs/41326530475/artifacts/3831201550) (`174,733 bytes` / ~`170.6 KB`) |
+
+### Step Execution Timeline
+```
+STEP STATUS         CONCLUSION   NAME
+--------------------------------------------------------------------------------
+1    completed      success      Set up job
+2    completed      success      Check Out Repository Code
+3    completed      success      Resolve Verification Mode (switched to native)
+4    completed      skipped      Check Out Release Verification Tests (Original Mode)
+5    completed      success      Check Out Send Notification Action
+6    completed      success      Set Up Java (Liberica 25)
+7    completed      skipped      Set Up Homebrew (Original Mode - skipped in native mode)
+8    completed      success      Set Up Gradle (v6.4.0)
+9    completed      success      Configure Gradle Properties
+10   completed      skipped      Run Release Verification Tests (Original Mode)
+11   completed      success      Run Release Verification Tests (Native Mode)
+12   completed      success      Record Verification Summary
+13   completed      success      Upload Build Reports
+14   completed      success      Send Notification
+```
 
 ---
 

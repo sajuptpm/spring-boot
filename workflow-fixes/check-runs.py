@@ -95,6 +95,22 @@ def check_runs(limit=5):
         except Exception as e:
             print(f"Could not load jobs details: {e}")
 
+    artifacts_url = first_run.get("artifacts_url")
+    if artifacts_url:
+        try:
+            req_art = urllib.request.Request(artifacts_url, headers=headers)
+            with urllib.request.urlopen(req_art) as resp:
+                art_data = json.loads(resp.read().decode("utf-8"))
+                artifacts = art_data.get("artifacts", [])
+                if artifacts:
+                    print(f"\nArtifacts ({len(artifacts)}):")
+                    for a in artifacts:
+                        print(f"  - {a.get('name')} ({a.get('size_in_bytes')} bytes)")
+                else:
+                    print("\nNo artifacts generated.")
+        except Exception as e:
+            print(f"Could not load artifacts: {e}")
+
 if __name__ == "__main__":
     lim = int(sys.argv[1]) if len(sys.argv) > 1 else 5
     check_runs(lim)
