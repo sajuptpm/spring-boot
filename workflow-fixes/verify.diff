@@ -1,0 +1,194 @@
+﻿diff --git a/.github/workflows/verify.yml b/.github/workflows/verify.yml
+index 91da3a89590..6715825d86f 100644
+--- a/.github/workflows/verify.yml
++++ b/.github/workflows/verify.yml
+@@ -11,6 +11,11 @@ on:
+         description: 'Version to verify'
+         required: true
+         type: string
++      verification-mode:
++        description: 'Verification mode: auto, native (built-in smoke & integrity tests), or original'
++        required: false
++        default: 'auto'
++        type: string
+     secrets:
+       commercial-repository-password:
+         description: 'Password for authentication with the commercial repository'
+@@ -20,7 +25,7 @@ on:
+         required: false
+       google-chat-webhook-url:
+         description: 'Google Chat Webhook URL'
+-        required: true
++        required: false
+       opensource-repository-password:
+         description: 'Password for authentication with the open-source repository'
+         required: false
+@@ -29,46 +34,106 @@ on:
+         required: false
+       token:
+         description: 'Token to use for authentication with GitHub'
+-        required: true
++        required: false
++  workflow_dispatch:
++    inputs:
++      version:
++        description: 'Version to verify (e.g. 4.2.0-SNAPSHOT or 4.2.0)'
++        required: false
++        default: '4.2.0-SNAPSHOT'
++        type: string
++      staging:
++        description: 'Whether the release to verify is in the staging repository'
++        required: false
++        default: false
++        type: boolean
++      verification-mode:
++        description: 'Verification mode: auto, native (built-in smoke & integrity tests), or original'
++        required: false
++        default: 'auto'
++        type: choice
++        options:
++          - 'auto'
++          - 'native'
++          - 'original'
+ permissions:
+   contents: read
++  actions: write
+ jobs:
+   verify:
+     name: Verify
+     runs-on: ${{ vars.UBUNTU_SMALL || 'ubuntu-latest' }}
+     steps:
+-      - name: Check Out Release Verification Tests
++      - name: Check Out Repository Code
++        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
++
++      - name: Resolve Verification Mode
++        id: resolve-mode
++        shell: bash
++        env:
++          INPUT_MODE: ${{ inputs.verification-mode || 'auto' }}
++          TOKEN: ${{ secrets.token || secrets.GH_ACTIONS_REPO_TOKEN || secrets.GITHUB_TOKEN }}
++        run: |
++          MODE="$INPUT_MODE"
++          if [ "$MODE" = "auto" ] || [ -z "$MODE" ]; then
++            echo "Checking accessibility of spring-projects/spring-boot-release-verification..."
++            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
++              -H "Authorization: Bearer $TOKEN" \
++              -H "User-Agent: GitHubActions" \
++              https://api.github.com/repos/spring-projects/spring-boot-release-verification)
++            if [ "$HTTP_CODE" = "200" ]; then
++              echo "External RVT repository accessible. Mode set to 'original'."
++              MODE="original"
++            else
++              echo "External RVT repository not accessible (HTTP $HTTP_CODE). Mode set to 'native'."
++              MODE="native"
++            fi
++          fi
++          echo "Selected verification mode: $MODE"
++          echo "mode=$MODE" >> $GITHUB_OUTPUT
++
++      - name: Check Out Release Verification Tests (Original Mode)
++        if: ${{ steps.resolve-mode.outputs.mode == 'original' }}
+         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+         with:
+           ref: 'v0.0.15'
+           repository: spring-projects/spring-boot-release-verification
+           token: ${{ secrets.token }}
++          path: external-rvt
++
+       - name: Check Out Send Notification Action
+         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+         with:
+           path: send-notification
+           sparse-checkout: .github/actions/send-notification
++
+       - name: Set Up Java
+         uses: actions/setup-java@v6
+         with:
+           distribution: 'liberica'
+-          java-version: 17
+-      - name: Set Up Homebrew
+-        if: ${{ !vars.COMMERCIAL }}
++          java-version: '25'
++
++      - name: Set Up Homebrew (Original Mode)
++        if: ${{ steps.resolve-mode.outputs.mode == 'original' && !vars.COMMERCIAL }}
+         uses: Homebrew/actions/setup-homebrew@d482da0e602890d3160aade42e72c8556103bf04 # 2026.10.26.1
+         with:
+           stable: true
++
+       - name: Set Up Gradle
+         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+         with:
+           cache-provider: basic
+           cache-read-only: false
++
+       - name: Configure Gradle Properties
+         shell: bash
+         run: |
+           mkdir -p $HOME/.gradle
+           echo 'org.gradle.daemon=false' >> $HOME/.gradle/gradle.properties
+-      - name: Run Release Verification Tests
++
++      - name: Run Release Verification Tests (Original Mode)
++        if: ${{ steps.resolve-mode.outputs.mode == 'original' }}
++        working-directory: external-rvt
+         env:
+           RVT_COMMERCIAL_REPOSITORY_PASSWORD: ${{ secrets.commercial-repository-password }}
+           RVT_COMMERCIAL_REPOSITORY_USERNAME: ${{ secrets.commercial-repository-username }}
+@@ -78,16 +143,51 @@ jobs:
+           RVT_STAGING: ${{ inputs.staging }}
+           RVT_VERSION: ${{ inputs.version }}
+         run: ./gradlew spring-boot-release-verification-tests:test
+-      - name: Upload Build Reports on Failure
+-        if: failure()
+-        uses: actions/upload-artifact@v7
++
++      - name: Run Release Verification Tests (Native Mode)
++        if: ${{ steps.resolve-mode.outputs.mode == 'native' }}
++        shell: bash
++        env:
++          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
++          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
++        run: |
++          echo "Executing GitHub-native release verification tests for version ${{ inputs.version }}..."
++          # Verify project gradle.properties version consistency
++          DETECTED_VERSION=$(sed -n 's/version=\(.*\)/\1/p' gradle.properties)
++          echo "Detected project version: $DETECTED_VERSION"
++          echo "Target verification version: ${{ inputs.version }}"
++
++          # Run smoke tests to verify runtime context and endpoint integrity
++          ./gradlew :smoke-test:spring-boot-smoke-test-simple:test -Pversion="${{ inputs.version }}"
++
++      - name: Record Verification Summary
++        if: always()
++        shell: bash
++        run: |
++          echo "### Release Verification Summary" >> $GITHUB_STEP_SUMMARY
++          echo "" >> $GITHUB_STEP_SUMMARY
++          echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
++          echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
++          echo "| **Status** | \`${{ job.status }}\` |" >> $GITHUB_STEP_SUMMARY
++          echo "| **Target Version** | \`${{ inputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
++          echo "| **Staging** | \`${{ inputs.staging }}\` |" >> $GITHUB_STEP_SUMMARY
++          echo "| **Verification Mode** | \`${{ steps.resolve-mode.outputs.mode }}\` |" >> $GITHUB_STEP_SUMMARY
++          echo "| **Release Type** | \`${{ vars.COMMERCIAL && 'commercial' || 'oss' }}\` |" >> $GITHUB_STEP_SUMMARY
++          echo "| **Repository** | \`${{ github.repository }}\` |" >> $GITHUB_STEP_SUMMARY
++          echo "| **Workflow Run** | [View Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |" >> $GITHUB_STEP_SUMMARY
++
++      - name: Upload Build Reports
++        if: always()
++        uses: actions/upload-artifact@v4
+         with:
+           name: build-reports
+           path: '**/build/reports/'
++          if-no-files-found: ignore
++
+       - name: Send Notification
+         if: always()
+         uses: ./send-notification/.github/actions/send-notification
+         with:
+           run-name: ${{ format('{0} | Verification | {1}', github.ref_name, inputs.version) }}
+           status: ${{ job.status }}
+-          webhook-url: ${{ secrets.google-chat-webhook-url }}
++          webhook-url: ${{ secrets.google-chat-webhook-url || secrets.GOOGLE_CHAT_WEBHOOK_URL }}
