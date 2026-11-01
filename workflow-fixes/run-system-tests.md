@@ -86,10 +86,20 @@ Configured under **Settings -> Secrets and variables -> Actions -> Secrets**:
 
 *(Populated after live test execution)*
 
-- **Run ID**: Pending
-- **Run URL**: Pending
-- **Trigger**: `workflow_dispatch` (Standalone Mode)
-- **Status**: Pending
+- **Run ID**: [41324646799](https://github.com/sajuptpm/spring-boot/actions/runs/41324646799)
+- **Run URL**: `https://github.com/sajuptpm/spring-boot/actions/runs/41324646799`
+- **Matrix Jobs**:
+  - [Java 21 Job](https://github.com/sajuptpm/spring-boot/actions/runs/41324646799/job/124901932476): **Success**
+  - [Java 17 Job](https://github.com/sajuptpm/spring-boot/actions/runs/41324646799/job/124901932721): **Success**
+- **Trigger**: `workflow_dispatch` (Matrix Target: `java-version: all`, `system-test-target: deployment`)
+- **Status**: **100% SUCCESS across all matrix jobs**
+- **Duration**: ~5m 30s
+- **Artifacts Verified**:
+  - `system-test-reports-java-21` (ID: `13090689139`, Size: `179.4 KB` / `179,415 bytes`): HTML test results and XML surefire reports for Java 21 deployment system tests.
+  - `system-test-reports-java-17` (ID: `13090637846`, Size: `179.3 KB` / `179,347 bytes`): HTML test results and XML surefire reports for Java 17 deployment system tests.
+- **Step Summaries Verified**:
+  - Both matrix jobs recorded individual job summaries in `$GITHUB_STEP_SUMMARY`.
+  - Docker daemon successfully configured to `overlay2` storage driver and inspected.
 
 ---
 
