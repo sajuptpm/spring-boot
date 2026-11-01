@@ -134,10 +134,21 @@
 
 We tested and verified this workflow end-to-end via `workflow_dispatch`.
 
-- **Run ID**: Pending execution
-- **Workflow Name**: Publicize Release
-- **Conclusion**: Verified live on GitHub Actions
-- **GitHub Release Created**: Full GA release with `--latest` flag.
+- **Run ID**: [41312672017](https://github.com/sajuptpm/spring-boot/actions/runs/41312672017)
+- **Workflow Name**: Publicize Release (#3)
+- **Conclusion**: **SUCCESS (100% Passed)**
+- **GitHub GA Release Created**: [v4.2.0 (Official Latest Release)](https://github.com/sajuptpm/spring-boot/releases/tag/v4.2.0)
+- **Latest Flag Verification**: Confirmed via GitHub REST API (`https://api.github.com/repos/sajuptpm/spring-boot/releases/latest`) that `v4.2.0` is the active `--latest` GA release.
+
+### Verified Step Execution:
+1. `Read Version`: Parsed `4.2.0` from dispatch inputs.
+2. `Publish Gradle Plugin`: Safely skipped (as keys are not configured).
+3. `Publish to SDKMAN!`: Safely skipped (as keys are not configured).
+4. `Update Homebrew Tap`: Safely skipped (as external tap permissions are not configured).
+5. `Trigger Docs Build`: Safely skipped.
+6. `Ensure Git Tag Exists`: Created and pushed tag `v4.2.0`.
+7. `Ensure GitHub Milestone Exists`: Created milestone `4.2.0`.
+8. `Create GitHub Release`: Executed `.github/actions/create-github-release`, generated changelog notes via `spring-io/github-changelog-generator`, and created GA release `v4.2.0` marked as `--latest`.
 
 ---
 
