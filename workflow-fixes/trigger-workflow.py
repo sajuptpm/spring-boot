@@ -3,13 +3,15 @@
 Trigger a GitHub Actions workflow in sajuptpm/spring-boot using Git Credential Manager or a GitHub Token.
 
 Usage:
-    python workflow-fixes/trigger-workflow.py <workflow-filename> [branch] [inputs_json]
+    python workflow-fixes/trigger-workflow.py <workflow-filename> [branch] [inputs]
     python workflow-fixes/trigger-workflow.py build-pull-request.yml main
+    python workflow-fixes/trigger-workflow.py publicize-release.yml main milestone=4.2.0,latest=true
     python workflow-fixes/trigger-workflow.py publicize-release.yml main '{"milestone": "4.2.0", "latest": "true"}'
 """
 
 import sys
 import json
+import re
 import urllib.request
 import subprocess
 
@@ -35,6 +37,41 @@ def get_token():
 
     return None
 
+def parse_inputs(raw):
+    if not raw:
+        return {}
+    if isinstance(raw, dict):
+        return raw
+    
+    # Format 1: Direct JSON
+    try:
+        return json.loads(raw)
+    except Exception:
+        pass
+
+    # Format 2: key=val,key2=val2
+    if "=" in raw:
+        data = {}
+        for part in raw.split(","):
+            if "=" in part:
+                k, v = part.split("=", 1)
+                data[k.strip().strip("'\"")] = v.strip().strip("'\"")
+        return data
+
+    # Format 3: PowerShell stripped quotes: {key: val, key2: val2}
+    try:
+        s = raw.strip("{}")
+        data = {}
+        for part in s.split(","):
+            if ":" in part:
+                k, v = part.split(":", 1)
+                data[k.strip().strip("'\"")] = v.strip().strip("'\"")
+        return data
+    except Exception:
+        pass
+
+    return {}
+
 def trigger_workflow(workflow_file, branch="main", inputs=None):
     token = get_token()
     if not token:
@@ -44,15 +81,10 @@ def trigger_workflow(workflow_file, branch="main", inputs=None):
 
     url = f"https://api.github.com/repos/{REPO}/actions/workflows/{workflow_file}/dispatches"
     body = {"ref": branch}
-    if inputs:
-        if isinstance(inputs, str):
-            try:
-                body["inputs"] = json.loads(inputs)
-            except Exception as e:
-                print(f"Warning: Failed to parse inputs as JSON: {e}")
-                body["inputs"] = {}
-        elif isinstance(inputs, dict):
-            body["inputs"] = inputs
+    
+    parsed_inputs = parse_inputs(inputs)
+    if parsed_inputs:
+        body["inputs"] = parsed_inputs
 
     payload = json.dumps(body).encode("utf-8")
     
@@ -79,8 +111,8 @@ def trigger_workflow(workflow_file, branch="main", inputs=None):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python trigger-workflow.py <workflow-filename> [branch] [inputs_json]")
-        print("Example: python trigger-workflow.py publicize-release.yml main '{\"milestone\": \"4.2.0\"}'")
+        print("Usage: python trigger-workflow.py <workflow-filename> [branch] [inputs]")
+        print("Example: python trigger-workflow.py publicize-release.yml main milestone=4.2.0,latest=true")
         sys.exit(1)
 
     wf = sys.argv[1]
