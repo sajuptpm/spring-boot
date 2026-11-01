@@ -73,10 +73,17 @@ Configured under **Settings -> Secrets and variables -> Actions -> Secrets**:
 
 *(Populated after live test execution)*
 
-- **Run ID**: Pending
-- **Run URL**: Pending
-- **Trigger**: `workflow_dispatch` (Standalone Mode)
-- **Status**: Pending
+- **Run ID**: [41321052131](https://github.com/sajuptpm/spring-boot/actions/runs/41321052131)
+- **Run URL**: `https://github.com/sajuptpm/spring-boot/actions/runs/41321052131`
+- **Job URL**: `https://github.com/sajuptpm/spring-boot/actions/runs/41321052131/job/124891158316`
+- **Trigger**: `workflow_dispatch` (Standalone Mode: `release-train: standalone`, `release-train-repository: none`)
+- **Status**: **100% SUCCESS**
+- **Duration**: ~22s
+- **Artifact Verified**:
+  - `release-train-deregistration` (ID: `13088713243`, Size: `301 bytes`): Generated `release-train-manifest.json` containing project de-registration data (`project`, `repository`, `branch`, `commit`, `release_train`, `status: left`).
+- **Step Summary Verified**:
+  - De-registered release branch `main` from train `standalone`
+  - Rendered complete metadata table and confirmed release train detachment.
 
 ---
 
