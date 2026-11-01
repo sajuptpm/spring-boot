@@ -1,7 +1,36 @@
 name: Test Release
+inputs:
+  test-tasks:
+    description: "Gradle test tasks to run"
+    required: false
+    default: "build -x dockerTest -x reclaimDockerSpace"
 runs:
   using: composite
   steps:
     - name: Test Release
       shell: bash
-      run:  ./gradlew build -x dockerTest -x reclaimDockerSpace
+      run: |
+        if [ -z "$RELEASE_TRAIN_MAVEN_REPOSITORY_URL" ]; then
+          unset RELEASE_TRAIN_MAVEN_REPOSITORY_URL
+        fi
+        if [ -z "$COMMERCIAL_RELEASE_REPO_URL" ]; then
+          unset COMMERCIAL_RELEASE_REPO_URL
+        fi
+        if [ -z "$RELEASE_TRAIN_MAVEN_REPOSITORY_USERNAME" ]; then
+          unset RELEASE_TRAIN_MAVEN_REPOSITORY_USERNAME
+        fi
+        if [ -z "$RELEASE_TRAIN_MAVEN_REPOSITORY_PASSWORD" ]; then
+          unset RELEASE_TRAIN_MAVEN_REPOSITORY_PASSWORD
+        fi
+        if [ -z "$COMMERCIAL_REPO_USERNAME" ]; then
+          unset COMMERCIAL_REPO_USERNAME
+        fi
+        if [ -z "$COMMERCIAL_REPO_PASSWORD" ]; then
+          unset COMMERCIAL_REPO_PASSWORD
+        fi
+        TASKS="${{ inputs.test-tasks }}"
+        if [ -z "$TASKS" ]; then
+          TASKS="build -x dockerTest -x reclaimDockerSpace"
+        fi
+        echo "Executing: ./gradlew $TASKS"
+        ./gradlew $TASKS
