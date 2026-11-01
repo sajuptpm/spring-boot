@@ -27,18 +27,26 @@ runs:
     - name: Generate Changelog
       uses: spring-io/github-changelog-generator@f7d7a87a3e7c627ecb8c26cf086c38ac5a939721 #v0.0.14
       with:
-        config-file: ${{ inputs.commercial && '.github/actions/create-github-release/changelog-generator-commercial.yml' || '.github/actions/create-github-release/changelog-generator-oss.yml' }}
+        config-file: ${{ (inputs.commercial == 'true' || inputs.commercial == true) && '.github/actions/create-github-release/changelog-generator-commercial.yml' || '.github/actions/create-github-release/changelog-generator-oss.yml' }}
         milestone: ${{ inputs.milestone }}
         token: ${{ inputs.token }}
-    - name: Create GitHub Release
-      if: ${{ !inputs.edit }}
+    - name: Create or Update GitHub Release
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.token }}
-      run: gh release create ${{ format('v{0}', inputs.milestone) }} --verify-tag --notes-file changelog.md ${{ inputs.pre-release == 'true' && '--prerelease' || format('--latest={0}', inputs.latest) }}
-    - name: Edit GitHub Release
-      if: ${{ inputs.edit }}
-      shell: bash
-      env:
-        GITHUB_TOKEN: ${{ inputs.token }}
-      run: gh release edit ${{ format('v{0}', inputs.milestone) }} --notes-file changelog.md
+      run: |
+        TAG="v${{ inputs.milestone }}"
+        EXTRA_FLAGS=""
+        if [ "${{ inputs.pre-release }}" = "true" ]; then
+          EXTRA_FLAGS="--prerelease"
+        else
+          EXTRA_FLAGS="--latest=${{ inputs.latest }}"
+        fi
+
+        if gh release view "$TAG" >/dev/null 2>&1; then
+          echo "Release $TAG already exists. Updating release notes..."
+          gh release edit "$TAG" --notes-file changelog.md $EXTRA_FLAGS
+        else
+          echo "Release $TAG does not exist. Creating release..."
+          gh release create "$TAG" --verify-tag --notes-file changelog.md $EXTRA_FLAGS
+        fi
