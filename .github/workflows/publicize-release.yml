@@ -59,17 +59,12 @@ jobs:
           else
             echo "mode=github-native" >> $GITHUB_OUTPUT
           fi
-      - name: Set Up Java
+      - name: Prepare Gradle Build
         if: steps.target.outputs.mode == 'github-native'
-        uses: actions/setup-java@b627117fa001eb706173b9e4a87e07fb8d35661b # v4.7.0
+        uses: ./.github/actions/prepare-gradle-build
         with:
-          distribution: 'liberica'
+          cache-read-only: 'false'
           java-version: '17'
-      - name: Set Up Gradle
-        if: steps.target.outputs.mode == 'github-native'
-        uses: gradle/actions/setup-gradle@94b5068f57324636d4a4355a1000572e909a34bc # v4.4.1
-        with:
-          cache-read-only: false
       - name: Build Gradle Plugin (GitHub Native)
         if: steps.target.outputs.mode == 'github-native'
         shell: bash
@@ -129,17 +124,12 @@ jobs:
           else
             echo "mode=github-native" >> $GITHUB_OUTPUT
           fi
-      - name: Set Up Java
+      - name: Prepare Gradle Build
         if: steps.sdkman-target.outputs.mode == 'github-native'
-        uses: actions/setup-java@b627117fa001eb706173b9e4a87e07fb8d35661b # v4.7.0
+        uses: ./.github/actions/prepare-gradle-build
         with:
-          distribution: 'liberica'
+          cache-read-only: 'false'
           java-version: '17'
-      - name: Set Up Gradle
-        if: steps.sdkman-target.outputs.mode == 'github-native'
-        uses: gradle/actions/setup-gradle@94b5068f57324636d4a4355a1000572e909a34bc # v4.4.1
-        with:
-          cache-read-only: false
       - name: Package Spring Boot CLI Binary (GitHub Native)
         if: steps.sdkman-target.outputs.mode == 'github-native'
         shell: bash
