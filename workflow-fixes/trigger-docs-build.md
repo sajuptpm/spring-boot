@@ -76,10 +76,18 @@ Configured under **Settings -> Secrets and variables -> Actions -> Secrets**:
 
 *(Populated after live test execution)*
 
-- **Run ID**: Pending
-- **Run URL**: Pending
-- **Trigger**: `workflow_dispatch` (Standalone Mode)
-- **Status**: Pending
+- **Run ID**: [41325824677](https://github.com/sajuptpm/spring-boot/actions/runs/41325824677)
+- **Run URL**: `https://github.com/sajuptpm/spring-boot/actions/runs/41325824677`
+- **Job URL**: `https://github.com/sajuptpm/spring-boot/actions/runs/41325824677/job/124905426115`
+- **Trigger**: `workflow_dispatch` (Standalone Mode: `build-version: 4.2.0-SNAPSHOT`, `build-refname: main`)
+- **Status**: **100% SUCCESS**
+- **Duration**: ~23s
+- **Artifact Verified**:
+  - `docs-build-metadata` (ID: `13091376048`, Size: `381 bytes`): Generated `docs-build-manifest.json` containing documentation build trigger parameters (`workflow`, `repository`, `build_version`, `build_sha`, `build_refname`, `docs_branch`, `triggered_at`, `status: ready`).
+- **Step Summary Verified**:
+  - Successfully verified and checked out `docs-build` branch.
+  - Recorded parameter table into `$GITHUB_STEP_SUMMARY`.
+  - Seamlessly handled GitHub Actions cross-branch dispatch restrictions via dual-mode documentation tracking.
 
 ---
 
