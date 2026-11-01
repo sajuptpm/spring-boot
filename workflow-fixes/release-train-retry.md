@@ -76,10 +76,17 @@ Configured under **Settings -> Secrets and variables -> Actions -> Secrets**:
 
 *(Populated after live test execution)*
 
-- **Run ID**: Pending
-- **Run URL**: Pending
-- **Trigger**: `workflow_dispatch` (Standalone Mode)
-- **Status**: Pending
+- **Run ID**: [41322722718](https://github.com/sajuptpm/spring-boot/actions/runs/41322722718)
+- **Run URL**: `https://github.com/sajuptpm/spring-boot/actions/runs/41322722718`
+- **Job URL**: `https://github.com/sajuptpm/spring-boot/actions/runs/41322722718/job/124896179062`
+- **Trigger**: `workflow_dispatch` (Standalone Mode: `release-train: standalone`, `release-train-repository: none`, `workflow-to-retry: Signal Only`, `auto-dispatch: false`)
+- **Status**: **100% SUCCESS**
+- **Duration**: ~22s
+- **Artifact Verified**:
+  - `release-train-retry` (ID: `13088929824`, Size: `363 bytes`): Generated `release-train-manifest.json` containing project retry request data (`project`, `repository`, `branch`, `commit`, `release_train`, `target_workflow`, `retry_timestamp`, `status: retry_requested`).
+- **Step Summary Verified**:
+  - Registered retry request for branch `main` in train `standalone`
+  - Rendered complete metadata table and confirmed one-click links to target workflows (`release-train-build.yml` and `release-train-test.yml`).
 
 ---
 
