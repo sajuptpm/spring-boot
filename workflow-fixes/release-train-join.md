@@ -76,10 +76,17 @@ Configured under **Settings -> Secrets and variables -> Actions -> Secrets**:
 
 *(Populated after live test execution)*
 
-- **Run ID**: Pending
-- **Run URL**: Pending
-- **Trigger**: `workflow_dispatch` (Standalone Mode)
-- **Status**: Pending
+- **Run ID**: [41319334774](https://github.com/sajuptpm/spring-boot/actions/runs/41319334774)
+- **Run URL**: `https://github.com/sajuptpm/spring-boot/actions/runs/41319334774`
+- **Job URL**: `https://github.com/sajuptpm/spring-boot/actions/runs/41319334774/job/124886017477`
+- **Trigger**: `workflow_dispatch` (Standalone Mode: `deployment-destination: Maven Central`, `release-train: standalone`, `release-train-repository: none`)
+- **Status**: **100% SUCCESS**
+- **Duration**: ~27s
+- **Artifact Verified**:
+  - `release-train-registration` (ID: `13089070046`, Size: `326 bytes`): Generated `release-train-manifest.json` containing project registration data (`project`, `repository`, `branch`, `commit`, `release_train`, `deployment_destination`, `status: joined`).
+- **Step Summary Verified**:
+  - Registered release branch `main` with commit SHA `9437cf97a03...`
+  - Rendered complete metadata table and links to downstream workflows (`release-train-build.yml`, `release-train-test.yml`, `release-train-ready.yml`).
 
 ---
 
