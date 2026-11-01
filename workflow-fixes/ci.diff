@@ -1,0 +1,51 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index f027ef3656b..311b6630a97 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -1,14 +1,15 @@
+ name: CI
+ on:
+-  push:
+-    branches:
+-      - 'main'
++  workflow_dispatch:
++#  push:
++#    branches:
++#      - 'main'
+ permissions:
+   contents: read
+ jobs:
+   ci:
+     name: '${{ matrix.os.name}} | Java ${{ matrix.java.version}}'
+-    if: ${{ github.repository == 'spring-projects/spring-boot' || github.repository == 'spring-projects/spring-boot-commercial' }}
++    if: ${{ github.repository == 'sajuptpm/spring-boot' || github.repository == 'spring-projects/spring-boot' || github.repository == 'spring-projects/spring-boot-commercial' || vars.ENABLE_CI == 'true' }}
+     runs-on: ${{ matrix.os.id }}
+     strategy:
+       fail-fast: false
+@@ -43,6 +44,17 @@ jobs:
+           Stop-Service -name Docker
+       - name: Check Out Code
+         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
++      - name: Check Notification Configuration
++        id: check-notification
++        shell: bash
++        env:
++          WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
++        run: |
++          if [ -n "$WEBHOOK_URL" ]; then
++            echo "enabled=true" >> "$GITHUB_OUTPUT"
++          else
++            echo "enabled=false" >> "$GITHUB_OUTPUT"
++          fi
+       - name: Build
+         id: build
+         uses: ./.github/actions/build
+@@ -58,7 +70,7 @@ jobs:
+           java-toolchain: ${{ matrix.java.toolchain }}
+           java-version: ${{ matrix.java.version }}
+       - name: Send Notification
+-        if: always()
++        if: always() && steps.check-notification.outputs.enabled == 'true'
+         uses: ./.github/actions/send-notification
+         with:
+           build-scan-url: ${{ steps.build.outputs.build-scan-url }}
