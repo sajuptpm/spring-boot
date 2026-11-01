@@ -162,3 +162,23 @@ GitHub Packages hosts Maven packages at `https://maven.pkg.github.com/sajuptpm/s
    - Go to `https://github.com/sajuptpm/spring-boot/actions/workflows/build-and-deploy-snapshot.yml`.
    - Click **Run workflow** -> Select `main` -> Click **Run workflow**.
 3. Once completed, your snapshot artifacts will appear under **Releases** at `https://github.com/sajuptpm/spring-boot/releases` and under the run's **Artifacts** section.
+
+
+---
+
+## 7. How to Manually Verify via the GitHub UI
+
+### Step 1: Verify the Actions Run Summary
+1. Navigate to: `https://github.com/sajuptpm/spring-boot/actions`
+2. Click **Build and Deploy Snapshot** in the left sidebar.
+3. Click the most recent run (e.g., `Build and Deploy Snapshot #6`).
+4. Look at the status header: confirms **Status: Success** with a green checkmark.
+5. In the run summary page, scroll to the **Artifacts** section at the bottom.
+6. Confirm that the `snapshot-artifacts-v4.2.0-SNAPSHOT` zip archive is listed with its file size (e.g. ~105 MB).
+
+### Step 2: Verify the GitHub Release & Assets
+1. Navigate to `https://github.com/sajuptpm/spring-boot/releases`.
+2. Look for the release named `Spring Boot 4.2.0-SNAPSHOT (Build #X)` (e.g., `v4.2.0-SNAPSHOT-build.6`).
+3. Confirm that it has a **`Pre-release`** badge.
+4. Click to expand **Assets**:
+   - Verify the published `.jar`, `.pom`, and checksum files (`.module`, `.jar.sha512`, etc.) are attached as downloadable release assets.

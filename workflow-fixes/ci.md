@@ -123,3 +123,23 @@ python workflow-fixes/check-runs.py 10
 ### Method 3: GitHub Web UI
 1. Navigate to: `https://github.com/sajuptpm/spring-boot/actions/workflows/ci.yml`
 2. Click **Run workflow** -> select branch `main` -> Click **Run workflow**.
+
+
+---
+
+## 7. How to Manually Verify via the GitHub UI
+
+### Step 1: Verify the Actions Run Summary
+1. Navigate to: `https://github.com/sajuptpm/spring-boot/actions`
+2. Click **CI** in the left sidebar.
+3. Click the most recent run (e.g., `CI #10`).
+4. Look at the matrix job listing:
+   - You will see 7 distinct matrix jobs listed:
+     - `CI (Linux, 17, adoptium, -P... -D...)`
+     - `CI (Linux, 21, adoptium, -P... -D...)`
+     - `CI (Linux, 25, adoptium, -P... -D...)`
+     - `CI (Linux, 27, graalvm, -P... -D...)`
+     - `CI (Windows, 17, adoptium, -P... -D...)`
+     - `CI (Windows, 21, adoptium, -P... -D...)`
+     - `CI (Windows, 25, adoptium, -P... -D...)`
+5. Click on any job to view its live runner allocation and Gradle compilation progress.

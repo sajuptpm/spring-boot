@@ -174,3 +174,24 @@ STEP STATUS         CONCLUSION   NAME
 1. Create a feature branch and push a commit.
 2. Open a Pull Request targeting `main`.
 3. The `Build Pull Request` check will trigger automatically on the PR page.
+
+
+---
+
+## 7. How to Manually Verify via the GitHub UI
+
+### Step 1: Verify the Actions Run Summary
+1. Navigate to: `https://github.com/sajuptpm/spring-boot/actions`
+2. Click **Build Pull Request** in the left sidebar.
+3. Click on the latest run (e.g. `Build Pull Request #3`).
+4. Confirm **Status: Success** with a green checkmark.
+5. In the job box, verify **Build Pull Request** shows a green checkmark.
+
+### Step 2: Verify Step Execution Logs
+1. Click the job **Build Pull Request**.
+2. Click to expand step **Build**.
+3. Confirm Gradle build summary ends with:
+   ```text
+   BUILD SUCCESSFUL in ...
+   ```
+4. If tested via a real Pull Request, open the Pull Request page -> scroll to the checks section at the bottom -> verify the check `build-pull-request / Build Pull Request` has a green checkmark.
