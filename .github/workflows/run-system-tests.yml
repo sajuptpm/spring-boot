@@ -1,21 +1,42 @@
 name: Run System Tests
 on:
-  push:
-    branches:
-      - "main"
+  workflow_dispatch:
+    inputs:
+      java-version:
+        description: "Target Java toolchain version ('all', '17', or '21')"
+        required: false
+        default: "21"
+        type: "choice"
+        options:
+          - "21"
+          - "17"
+          - "all"
+      system-test-target:
+        description: "System test target ('deployment', 'image', or 'all')"
+        required: false
+        default: "deployment"
+        type: "choice"
+        options:
+          - "deployment"
+          - "image"
+          - "all"
+  # push:
+  #   branches:
+  #     - "main"
 permissions:
   contents: read
 jobs:
   run-system-tests:
     name: "Java ${{ matrix.java.version}}"
-    if: ${{ github.repository == 'spring-projects/spring-boot' }}
+    if: (github.repository == 'sajuptpm/spring-boot' || github.repository == 'spring-projects/spring-boot') && (inputs.java-version == null || inputs.java-version == 'all' || inputs.java-version == matrix.java.version)
     runs-on: ${{ vars.UBUNTU_MEDIUM || 'ubuntu-latest' }}
     strategy:
+      fail-fast: false
       matrix:
         java:
-          - version: 17
+          - version: "17"
             toolchain: true
-          - version: 21
+          - version: "21"
             toolchain: true
     steps:
       - name: Switch Docker to Overlay2
@@ -34,7 +55,21 @@ jobs:
       - name: Run System Tests
         id: run-system-tests
         shell: bash
-        run: ./gradlew systemTest
+        run: |
+          TARGET="${{ inputs.system-test-target || 'all' }}"
+          case "$TARGET" in
+            "deployment")
+              TASK=":system-test:spring-boot-deployment-system-tests:systemTest"
+              ;;
+            "image")
+              TASK=":system-test:spring-boot-image-system-tests:systemTest"
+              ;;
+            *)
+              TASK="systemTest"
+              ;;
+          esac
+          echo "Executing system test task: ./gradlew $TASK"
+          ./gradlew $TASK
       - name: Show docker info
         if: always()
         shell: bash
@@ -43,8 +78,28 @@ jobs:
         if: always()
         shell: bash
         run: docker image ls --digests
-      - name: Send Notification
+      - name: Record Job Summary
         if: always()
+        shell: bash
+        run: |
+          echo "### System Tests – Java ${{ matrix.java.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Status** | \`${{ job.status }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Java Toolchain** | Java \`${{ matrix.java.version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Test Target** | \`${{ inputs.system-test-target || 'all' }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Workflow Run** | [View Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |" >> $GITHUB_STEP_SUMMARY
+      - name: Upload Test Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: "system-test-reports-java-${{ matrix.java.version }}"
+          path: "**/build/reports"
+          if-no-files-found: ignore
+      - name: Send Notification
+        if: always() && secrets.GOOGLE_CHAT_WEBHOOK_URL != ''
         uses: ./.github/actions/send-notification
         with:
           build-scan-url: ${{ steps.run-system-tests.outputs.build-scan-url }}
