@@ -1,6 +1,6 @@
 name: "Run CodeQL Analysis"
 on:
-  push:
+#  push:
   pull_request:
   workflow_dispatch:
 permissions: read-all

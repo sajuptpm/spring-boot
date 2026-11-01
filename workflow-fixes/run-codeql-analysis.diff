@@ -1,0 +1,12 @@
+﻿diff --git a/.github/workflows/run-codeql-analysis.yml b/.github/workflows/run-codeql-analysis.yml
+index a558fe13eca..eab50ed52e4 100644
+--- a/.github/workflows/run-codeql-analysis.yml
++++ b/.github/workflows/run-codeql-analysis.yml
+@@ -1,6 +1,6 @@
+ name: "Run CodeQL Analysis"
+ on:
+-  push:
++#  push:
+   pull_request:
+   workflow_dispatch:
+ permissions: read-all
