@@ -1,141 +1,183 @@
 diff --git a/.github/workflows/publicize-milestone.yml b/.github/workflows/publicize-milestone.yml
-index 4ecae6b1c23..66a7bdd7e1e 100644
+index 66a7bdd7e1e..5a62f8289b2 100644
 --- a/.github/workflows/publicize-milestone.yml
 +++ b/.github/workflows/publicize-milestone.yml
-@@ -1,9 +1,17 @@
- name: Publicize Prerelease
- on:
-+  workflow_dispatch:
-+    inputs:
-+      milestone:
-+        description: 'Version or milestone to publicize (e.g. 4.2.0-M1, 4.2.0-RC1). Leave blank to read from gradle.properties'
-+        required: false
-+        default: ''
-   push:
-     tags:
--      - v4.2.0-M[1-9]
--      - v4.2.0-RC[1-9]
-+      - 'v4.2.0-M[1-9]'
-+      - 'v4.2.0-RC[1-9]'
-+      - 'v*-M*'
-+      - 'v*-RC*'
- permissions:
-   contents: read
- concurrency:
-@@ -19,14 +27,18 @@ jobs:
-         id: read-version
-         shell: bash
-         run: |
--          version=$(sed -n 's/version=\(.*\)/\1/p' gradle.properties)
-+          if [ -n "${{ github.event.inputs.milestone }}" ]; then
-+            version="${{ github.event.inputs.milestone }}"
-+          else
-+            version=$(sed -n 's/version=\(.*\)/\1/p' gradle.properties)
-+          fi
-           echo "Version is $version"
-           echo "version=$version" >> $GITHUB_OUTPUT
-     outputs:
+@@ -38,14 +38,69 @@ jobs:
        version: ${{ steps.read-version.outputs.version }}
    publish-gradle-plugin:
      name: Publish Gradle Plugin
--    if: ${{ !vars.COMMERCIAL }}
-+    if: ${{ vars.ENABLE_PUBLISH_GRADLE_PLUGIN == 'true' }}
+-    if: ${{ vars.ENABLE_PUBLISH_GRADLE_PLUGIN == 'true' }}
      needs:
        - read-version
      runs-on: 'ubuntu-latest'
-@@ -43,6 +55,7 @@ jobs:
-           plugin-version: ${{ needs.read-version.outputs.version }}
-   trigger-docs-build:
-     name: Trigger Docs Build
-+    if: ${{ vars.TRIGGER_DOCS_BUILD == 'true' || github.repository == 'spring-projects/spring-boot' }}
-     needs:
-       - read-version
-     permissions:
-@@ -59,14 +72,42 @@ jobs:
-       - read-version
-       - publish-gradle-plugin
-       - trigger-docs-build
-+    if: ${{ !cancelled() && !failure() }}
 +    permissions:
-+      contents: write
-+      issues: write
-     runs-on: 'ubuntu-latest'
++      contents: read
++      packages: write
      steps:
        - name: Check Out Code
          uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-+        with:
-+          fetch-depth: 0
-+      - name: Ensure Git Tag Exists
+-      - name: Publish
++      - name: Determine Publishing Target
++        id: target
 +        shell: bash
-+        env:
-+          GH_TOKEN: ${{ secrets.GH_ACTIONS_REPO_TOKEN || secrets.GITHUB_TOKEN }}
++        run: |
++          if [ "${{ vars.PLUGIN_PUBLISH_TARGET }}" = "gradle-portal" ] || { [ -n "${{ secrets.GRADLE_PLUGIN_PUBLISH_KEY }}" ] && [ "${{ vars.PLUGIN_PUBLISH_TARGET }}" != "github-native" ]; }; then
++            echo "mode=gradle-portal" >> $GITHUB_OUTPUT
++          else
++            echo "mode=github-native" >> $GITHUB_OUTPUT
++          fi
++      - name: Set Up Java
++        if: steps.target.outputs.mode == 'github-native'
++        uses: actions/setup-java@b627117fa001eb706173b9e4a87e07fb8d35661b # v4.7.0
++        with:
++          distribution: 'liberica'
++          java-version: '17'
++      - name: Set Up Gradle
++        if: steps.target.outputs.mode == 'github-native'
++        uses: gradle/actions/setup-gradle@94b5068f57324636d4a4355a1000572e909a34bc # v4.4.1
++        with:
++          cache-read-only: false
++      - name: Build Gradle Plugin (GitHub Native)
++        if: steps.target.outputs.mode == 'github-native'
++        shell: bash
 +        run: |
 +          version="${{ needs.read-version.outputs.version }}"
-+          tag="v${version}"
-+          if ! git rev-parse "$tag" >/dev/null 2>&1; then
-+            echo "Tag $tag not found locally or on remote. Creating tag $tag..."
-+            git tag "$tag"
-+            git push origin "$tag" || true
-+          else
-+            echo "Tag $tag already exists."
++          echo "Building Gradle Plugin publication for $version..."
++          ./gradlew :build-plugin:spring-boot-gradle-plugin:publishPluginMavenPublicationToProjectRepository -x test -Pversion="$version"
++      - name: Publish to GitHub Packages (Maven)
++        if: steps.target.outputs.mode == 'github-native'
++        shell: bash
++        env:
++          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
++        run: |
++          repo_dir="build-plugin/spring-boot-gradle-plugin/build/maven-repository"
++          if [ -d "$repo_dir" ]; then
++            echo "Publishing plugin artifacts to GitHub Packages (https://maven.pkg.github.com/${{ github.repository }})..."
++            find "$repo_dir" -type f | while read -r file; do
++              rel_path="${file#$repo_dir/}"
++              echo "Uploading $rel_path..."
++              curl -s -o /dev/null -w "%{http_code}\n" -X PUT \
++                -H "Authorization: Bearer $GITHUB_TOKEN" \
++                -T "$file" \
++                "https://maven.pkg.github.com/${{ github.repository }}/$rel_path" || true
++            done
 +          fi
-+      - name: Ensure GitHub Milestone Exists
++      - name: Upload Plugin Artifacts
++        if: steps.target.outputs.mode == 'github-native'
++        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
++        with:
++          name: spring-boot-gradle-plugin-v${{ needs.read-version.outputs.version }}
++          path: build-plugin/spring-boot-gradle-plugin/build/maven-repository/
++          if-no-files-found: warn
++      - name: Publish to Gradle Plugin Portal (Original Upstream)
++        if: steps.target.outputs.mode == 'gradle-portal'
+         uses: ./.github/actions/publish-gradle-plugin
+         with:
+           build-number: '2026.4'
+@@ -55,17 +110,66 @@ jobs:
+           plugin-version: ${{ needs.read-version.outputs.version }}
+   trigger-docs-build:
+     name: Trigger Docs Build
+-    if: ${{ vars.TRIGGER_DOCS_BUILD == 'true' || github.repository == 'spring-projects/spring-boot' }}
+     needs:
+       - read-version
++    runs-on: 'ubuntu-latest'
+     permissions:
++      contents: read
+       actions: write
+-    runs-on: 'ubuntu-latest'
+     steps:
+-      - name: Run Deploy Docs Workflow
++      - name: Check Out Code
++        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
++      - name: Determine Docs Build Mode
++        id: docs-mode
++        shell: bash
++        run: |
++          if [ "${{ vars.DOCS_BUILD_TARGET }}" = "upstream" ] || [ "${{ github.repository }}" = "spring-projects/spring-boot" ]; then
++            echo "mode=upstream" >> $GITHUB_OUTPUT
++          else
++            echo "mode=github-native" >> $GITHUB_OUTPUT
++          fi
++      - name: Trigger Upstream Deploy Docs Workflow
++        if: steps.docs-mode.outputs.mode == 'upstream'
+         env:
+           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+-        run: gh workflow run deploy-docs.yml --repo ${{ github.repository }} -r docs-build -f build-refname=${{ github.ref_name }} -f build-version=${{ needs.read-version.outputs.version }}
++        run: |
++          gh workflow run deploy-docs.yml --repo ${{ github.repository }} -r docs-build \
++            -f build-refname=${{ github.ref_name }} \
++            -f build-version=${{ needs.read-version.outputs.version }}
++      - name: Package Documentation (GitHub Native)
++        if: steps.docs-mode.outputs.mode == 'github-native'
++        shell: bash
++        run: |
++          version="${{ needs.read-version.outputs.version }}"
++          mkdir -p build/docs-package
++          echo "Packaging documentation source and reference modules for v${version}..."
++          
++          cat << 'EOF' > build/docs-package/index.html
++          <!DOCTYPE html>
++          <html>
++          <head>
++            <meta charset="utf-8">
++            <title>Spring Boot Documentation</title>
++            <meta http-equiv="refresh" content="0; url=https://docs.spring.io/spring-boot/index.html">
++          </head>
++          <body>
++            <h1>Spring Boot Documentation</h1>
++            <p>Redirecting to <a href="https://docs.spring.io/spring-boot/index.html">Spring Boot Reference Guide</a>...</p>
++          </body>
++          </html>
++          EOF
++          
++          cp -r documentation/spring-boot-docs/src/docs/antora build/docs-package/antora-docs || true
++          cp -r build-plugin/spring-boot-gradle-plugin/src/docs/antora build/docs-package/gradle-plugin-docs || true
++          
++          cd build && zip -r "spring-boot-docs-v${version}.zip" docs-package
++      - name: Upload Documentation Artifact
++        if: steps.docs-mode.outputs.mode == 'github-native'
++        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
++        with:
++          name: spring-boot-docs-v${{ needs.read-version.outputs.version }}
++          path: build/spring-boot-docs-v*.zip
++          if-no-files-found: warn
+   create-github-release:
+     name: Create GitHub Release
+     needs:
+@@ -82,6 +186,18 @@ jobs:
+         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+         with:
+           fetch-depth: 0
++      - name: Download Plugin Artifacts
++        uses: actions/download-artifact@v4
++        with:
++          name: spring-boot-gradle-plugin-v${{ needs.read-version.outputs.version }}
++          path: downloaded-artifacts/plugin/
++        continue-on-error: true
++      - name: Download Docs Artifacts
++        uses: actions/download-artifact@v4
++        with:
++          name: spring-boot-docs-v${{ needs.read-version.outputs.version }}
++          path: downloaded-artifacts/docs/
++        continue-on-error: true
+       - name: Ensure Git Tag Exists
+         shell: bash
+         env:
+@@ -111,3 +227,16 @@ jobs:
+           pre-release: true
+           milestone: ${{ needs.read-version.outputs.version }}
+           token: ${{ secrets.GH_ACTIONS_REPO_TOKEN || secrets.GITHUB_TOKEN }}
++      - name: Attach Plugin & Docs Assets to Release
 +        shell: bash
 +        env:
 +          GH_TOKEN: ${{ secrets.GH_ACTIONS_REPO_TOKEN || secrets.GITHUB_TOKEN }}
 +        run: |
-+          milestone="${{ needs.read-version.outputs.version }}"
-+          echo "Ensuring GitHub milestone exists for: $milestone"
-+          gh api "repos/${{ github.repository }}/milestones" -f title="$milestone" -f state="open" || true
-       - name: Create GitHub Release
-         uses: ./.github/actions/create-github-release
-         with:
--          commercial: ${{ vars.COMMERCIAL }}
-+          commercial: ${{ vars.COMMERCIAL || false }}
-           pre-release: true
-           milestone: ${{ needs.read-version.outputs.version }}
--          token: ${{ secrets.GH_ACTIONS_REPO_TOKEN }}
-\ No newline at end of file
-+          token: ${{ secrets.GH_ACTIONS_REPO_TOKEN || secrets.GITHUB_TOKEN }}
-
-diff --git a/.github/actions/create-github-release/action.yml b/.github/actions/create-github-release/action.yml
-index 4a4aeca6726..8712a549deb 100644
---- a/.github/actions/create-github-release/action.yml
-+++ b/.github/actions/create-github-release/action.yml
-@@ -27,18 +27,26 @@ runs:
-     - name: Generate Changelog
-       uses: spring-io/github-changelog-generator@f7d7a87a3e7c627ecb8c26cf086c38ac5a939721 #v0.0.14
-       with:
--        config-file: ${{ inputs.commercial && '.github/actions/create-github-release/changelog-generator-commercial.yml' || '.github/actions/create-github-release/changelog-generator-oss.yml' }}
-+        config-file: ${{ (inputs.commercial == 'true' || inputs.commercial == true) && '.github/actions/create-github-release/changelog-generator-commercial.yml' || '.github/actions/create-github-release/changelog-generator-oss.yml' }}
-         milestone: ${{ inputs.milestone }}
-         token: ${{ inputs.token }}
--    - name: Create GitHub Release
--      if: ${{ !inputs.edit }}
-+    - name: Create or Update GitHub Release
-       shell: bash
-       env:
-         GITHUB_TOKEN: ${{ inputs.token }}
--      run: gh release create ${{ format('v{0}', inputs.milestone) }} --verify-tag --notes-file changelog.md ${{ inputs.pre-release == 'true' && '--prerelease' || format('--latest={0}', inputs.latest) }}
--    - name: Edit GitHub Release
--      if: ${{ inputs.edit }}
--      shell: bash
--      env:
--        GITHUB_TOKEN: ${{ inputs.token }}
--      run: gh release edit ${{ format('v{0}', inputs.milestone) }} --notes-file changelog.md
-+      run: |
-+        TAG="v${{ inputs.milestone }}"
-+        EXTRA_FLAGS=""
-+        if [ "${{ inputs.pre-release }}" = "true" ]; then
-+          EXTRA_FLAGS="--prerelease"
-+        else
-+          EXTRA_FLAGS="--latest=${{ inputs.latest }}"
-+        fi
-+
-+        if gh release view "$TAG" >/dev/null 2>&1; then
-+          echo "Release $TAG already exists. Updating release notes..."
-+          gh release edit "$TAG" --notes-file changelog.md $EXTRA_FLAGS
-+        else
-+          echo "Release $TAG does not exist. Creating release..."
-+          gh release create "$TAG" --verify-tag --notes-file changelog.md $EXTRA_FLAGS
-+        fi
++          tag="v${{ needs.read-version.outputs.version }}"
++          echo "Attaching built artifacts to release $tag..."
++          if [ -d "downloaded-artifacts" ]; then
++            find downloaded-artifacts -type f \( -name "*.jar" -o -name "*.zip" -o -name "*.pom" \) | while read -r asset; do
++              echo "Uploading $asset..."
++              gh release upload "$tag" "$asset" --clobber || true
++            done
++          fi

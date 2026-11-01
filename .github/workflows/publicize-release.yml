@@ -38,16 +38,72 @@ jobs:
           echo "version=$version" >> $GITHUB_OUTPUT
     outputs:
       version: ${{ steps.read-version.outputs.version }}
+
   publish-gradle-plugin:
     name: Publish Gradle Plugin
-    if: ${{ vars.ENABLE_PUBLISH_GRADLE_PLUGIN == 'true' }}
     needs:
       - read-version
     runs-on: 'ubuntu-latest'
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Check Out Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Publish
+      - name: Determine Publishing Target
+        id: target
+        shell: bash
+        run: |
+          if [ "${{ vars.PLUGIN_PUBLISH_TARGET }}" = "gradle-portal" ] || { [ -n "${{ secrets.GRADLE_PLUGIN_PUBLISH_KEY }}" ] && [ "${{ vars.PLUGIN_PUBLISH_TARGET }}" != "github-native" ]; }; then
+            echo "mode=gradle-portal" >> $GITHUB_OUTPUT
+          else
+            echo "mode=github-native" >> $GITHUB_OUTPUT
+          fi
+      - name: Set Up Java
+        if: steps.target.outputs.mode == 'github-native'
+        uses: actions/setup-java@b627117fa001eb706173b9e4a87e07fb8d35661b # v4.7.0
+        with:
+          distribution: 'liberica'
+          java-version: '17'
+      - name: Set Up Gradle
+        if: steps.target.outputs.mode == 'github-native'
+        uses: gradle/actions/setup-gradle@94b5068f57324636d4a4355a1000572e909a34bc # v4.4.1
+        with:
+          cache-read-only: false
+      - name: Build Gradle Plugin (GitHub Native)
+        if: steps.target.outputs.mode == 'github-native'
+        shell: bash
+        run: |
+          version="${{ needs.read-version.outputs.version }}"
+          echo "Building Gradle Plugin publication for $version..."
+          ./gradlew :build-plugin:spring-boot-gradle-plugin:publishPluginMavenPublicationToProjectRepository -x test -Pversion="$version"
+      - name: Publish to GitHub Packages (Maven)
+        if: steps.target.outputs.mode == 'github-native'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          repo_dir="build-plugin/spring-boot-gradle-plugin/build/maven-repository"
+          if [ -d "$repo_dir" ]; then
+            echo "Publishing plugin artifacts to GitHub Packages (https://maven.pkg.github.com/${{ github.repository }})..."
+            find "$repo_dir" -type f | while read -r file; do
+              rel_path="${file#$repo_dir/}"
+              echo "Uploading $rel_path..."
+              curl -s -o /dev/null -w "%{http_code}\n" -X PUT \
+                -H "Authorization: Bearer $GITHUB_TOKEN" \
+                -T "$file" \
+                "https://maven.pkg.github.com/${{ github.repository }}/$rel_path" || true
+            done
+          fi
+      - name: Upload Plugin Artifacts
+        if: steps.target.outputs.mode == 'github-native'
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: spring-boot-gradle-plugin-v${{ needs.read-version.outputs.version }}
+          path: build-plugin/spring-boot-gradle-plugin/build/maven-repository/
+          if-no-files-found: warn
+      - name: Publish to Gradle Plugin Portal (Original Upstream)
+        if: steps.target.outputs.mode == 'gradle-portal'
         uses: ./.github/actions/publish-gradle-plugin
         with:
           build-number: '2026.4'
@@ -55,49 +111,175 @@ jobs:
           gradle-plugin-publish-secret: ${{ secrets.GRADLE_PLUGIN_PUBLISH_SECRET }}
           jfrog-cli-config-token: ${{ secrets.JF_ARTIFACTORY_SPRING }}
           plugin-version: ${{ needs.read-version.outputs.version }}
+
   publish-to-sdkman:
     name: Publish to SDKMAN!
-    if: ${{ vars.ENABLE_SDKMAN_PUBLISH == 'true' }}
     needs:
       - read-version
     runs-on: 'ubuntu-latest'
     steps:
       - name: Check Out Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Publish to SDKMAN!
+      - name: Determine SDKMAN Target
+        id: sdkman-target
+        shell: bash
+        run: |
+          if [ "${{ vars.ENABLE_SDKMAN_PUBLISH }}" = "true" ] && [ -n "${{ secrets.SDKMAN_CONSUMER_KEY }}" ]; then
+            echo "mode=upstream" >> $GITHUB_OUTPUT
+          else
+            echo "mode=github-native" >> $GITHUB_OUTPUT
+          fi
+      - name: Set Up Java
+        if: steps.sdkman-target.outputs.mode == 'github-native'
+        uses: actions/setup-java@b627117fa001eb706173b9e4a87e07fb8d35661b # v4.7.0
+        with:
+          distribution: 'liberica'
+          java-version: '17'
+      - name: Set Up Gradle
+        if: steps.sdkman-target.outputs.mode == 'github-native'
+        uses: gradle/actions/setup-gradle@94b5068f57324636d4a4355a1000572e909a34bc # v4.4.1
+        with:
+          cache-read-only: false
+      - name: Package Spring Boot CLI Binary (GitHub Native)
+        if: steps.sdkman-target.outputs.mode == 'github-native'
+        shell: bash
+        run: |
+          version="${{ needs.read-version.outputs.version }}"
+          echo "Building Spring Boot CLI distribution for $version..."
+          ./gradlew :cli:spring-boot-cli:distZip -x test -Pversion="$version" || true
+      - name: Upload CLI Distribution Artifact
+        if: steps.sdkman-target.outputs.mode == 'github-native'
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: spring-boot-cli-dist-v${{ needs.read-version.outputs.version }}
+          path: cli/spring-boot-cli/build/distributions/*.zip
+          if-no-files-found: warn
+      - name: Publish to SDKMAN! (Original Upstream)
+        if: steps.sdkman-target.outputs.mode == 'upstream'
         uses: ./.github/actions/publish-to-sdkman
         with:
           make-default: false
           sdkman-consumer-key: ${{ secrets.SDKMAN_CONSUMER_KEY }}
           sdkman-consumer-token: ${{ secrets.SDKMAN_CONSUMER_TOKEN }}
           spring-boot-version: ${{ needs.read-version.outputs.version }}
+
   update-homebrew-tap:
     name: Update Homebrew Tap
-    if: ${{ vars.ENABLE_HOMEBREW_TAP == 'true' || github.repository == 'spring-projects/spring-boot' }}
     needs:
       - read-version
     runs-on: 'ubuntu-latest'
     steps:
       - name: Check Out Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Update Homebrew Tap
+      - name: Determine Homebrew Target
+        id: brew-target
+        shell: bash
+        run: |
+          if [ "${{ github.repository }}" = "spring-projects/spring-boot" ] || [ "${{ vars.ENABLE_HOMEBREW_TAP }}" = "true" ]; then
+            echo "mode=upstream" >> $GITHUB_OUTPUT
+          else
+            echo "mode=github-native" >> $GITHUB_OUTPUT
+          fi
+      - name: Generate Homebrew Formula (GitHub Native)
+        if: steps.brew-target.outputs.mode == 'github-native'
+        shell: bash
+        run: |
+          version="${{ needs.read-version.outputs.version }}"
+          mkdir -p build/homebrew
+          cat << EOF > build/homebrew/spring-boot.rb
+          class SpringBoot < Formula
+            desc "Spring Boot CLI"
+            homepage "https://spring.io/projects/spring-boot"
+            url "https://github.com/${{ github.repository }}/releases/download/v${version}/spring-boot-cli-${version}-bin.zip"
+            version "${version}"
+            
+            def install
+              bin.install "bin/spring"
+            end
+
+            test do
+              system "#{bin}/spring", "--version"
+            end
+          end
+          EOF
+          echo "Generated Homebrew formula in build/homebrew/spring-boot.rb"
+      - name: Upload Homebrew Formula Artifact
+        if: steps.brew-target.outputs.mode == 'github-native'
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: spring-boot-homebrew-formula-v${{ needs.read-version.outputs.version }}
+          path: build/homebrew/spring-boot.rb
+          if-no-files-found: warn
+      - name: Update Homebrew Tap (Original Upstream)
+        if: steps.brew-target.outputs.mode == 'upstream'
         uses: ./.github/actions/update-homebrew-tap
         with:
           spring-boot-version: ${{ needs.read-version.outputs.version }}
           token: ${{ secrets.GH_ACTIONS_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+
   trigger-docs-build:
     name: Trigger Docs Build
-    if: ${{ vars.TRIGGER_DOCS_BUILD == 'true' || github.repository == 'spring-projects/spring-boot' }}
     needs:
       - read-version
-    permissions:
-      actions: write
     runs-on: 'ubuntu-latest'
+    permissions:
+      contents: read
+      actions: write
     steps:
-      - name: Run Deploy Docs Workflow
+      - name: Check Out Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Determine Docs Build Mode
+        id: docs-mode
+        shell: bash
+        run: |
+          if [ "${{ vars.DOCS_BUILD_TARGET }}" = "upstream" ] || [ "${{ github.repository }}" = "spring-projects/spring-boot" ]; then
+            echo "mode=upstream" >> $GITHUB_OUTPUT
+          else
+            echo "mode=github-native" >> $GITHUB_OUTPUT
+          fi
+      - name: Trigger Upstream Deploy Docs Workflow
+        if: steps.docs-mode.outputs.mode == 'upstream'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run deploy-docs.yml --repo ${{ github.repository }} -r docs-build -f build-refname=${{ github.ref_name }} -f build-version=${{ needs.read-version.outputs.version }}
+        run: |
+          gh workflow run deploy-docs.yml --repo ${{ github.repository }} -r docs-build \
+            -f build-refname=${{ github.ref_name }} \
+            -f build-version=${{ needs.read-version.outputs.version }}
+      - name: Package Documentation (GitHub Native)
+        if: steps.docs-mode.outputs.mode == 'github-native'
+        shell: bash
+        run: |
+          version="${{ needs.read-version.outputs.version }}"
+          mkdir -p build/docs-package
+          echo "Packaging documentation source and reference modules for v${version}..."
+          
+          cat << 'EOF' > build/docs-package/index.html
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <title>Spring Boot Documentation</title>
+            <meta http-equiv="refresh" content="0; url=https://docs.spring.io/spring-boot/index.html">
+          </head>
+          <body>
+            <h1>Spring Boot Documentation</h1>
+            <p>Redirecting to <a href="https://docs.spring.io/spring-boot/index.html">Spring Boot Reference Guide</a>...</p>
+          </body>
+          </html>
+          EOF
+          
+          cp -r documentation/spring-boot-docs/src/docs/antora build/docs-package/antora-docs || true
+          cp -r build-plugin/spring-boot-gradle-plugin/src/docs/antora build/docs-package/gradle-plugin-docs || true
+          
+          cd build && zip -r "spring-boot-docs-v${version}.zip" docs-package
+      - name: Upload Documentation Artifact
+        if: steps.docs-mode.outputs.mode == 'github-native'
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: spring-boot-docs-v${{ needs.read-version.outputs.version }}
+          path: build/spring-boot-docs-v*.zip
+          if-no-files-found: warn
+
   create-github-release:
     name: Create GitHub Release
     needs:
@@ -116,6 +298,30 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+      - name: Download Plugin Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: spring-boot-gradle-plugin-v${{ needs.read-version.outputs.version }}
+          path: downloaded-artifacts/plugin/
+        continue-on-error: true
+      - name: Download Docs Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: spring-boot-docs-v${{ needs.read-version.outputs.version }}
+          path: downloaded-artifacts/docs/
+        continue-on-error: true
+      - name: Download CLI Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: spring-boot-cli-dist-v${{ needs.read-version.outputs.version }}
+          path: downloaded-artifacts/cli/
+        continue-on-error: true
+      - name: Download Homebrew Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: spring-boot-homebrew-formula-v${{ needs.read-version.outputs.version }}
+          path: downloaded-artifacts/homebrew/
+        continue-on-error: true
       - name: Ensure Git Tag Exists
         shell: bash
         env:
@@ -145,3 +351,16 @@ jobs:
           latest: ${{ github.event.inputs.latest || 'true' }}
           milestone: ${{ needs.read-version.outputs.version }}
           token: ${{ secrets.GH_ACTIONS_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+      - name: Attach Built Assets to GA Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GH_ACTIONS_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          tag="v${{ needs.read-version.outputs.version }}"
+          echo "Attaching built artifacts to release $tag..."
+          if [ -d "downloaded-artifacts" ]; then
+            find downloaded-artifacts -type f \( -name "*.jar" -o -name "*.zip" -o -name "*.pom" -o -name "*.rb" \) | while read -r asset; do
+              echo "Uploading $asset..."
+              gh release upload "$tag" "$asset" --clobber || true
+            done
+          fi
