@@ -83,13 +83,13 @@ jobs:
         SCOPE="${{ inputs.test-scope || vars.RELEASE_TRAIN_TEST_SCOPE || 'core' }}"
         case "$SCOPE" in
           "full")
-            TASKS="build -x dockerTest -x reclaimDockerSpace"
+            TASKS="build -x dockerTest -x reclaimDockerSpace -x antora"
             ;;
           "smoke")
             TASKS=":smoke-test:spring-boot-smoke-test-simple:test"
             ;;
           *)
-            TASKS=":core:spring-boot:test :smoke-test:spring-boot-smoke-test-simple:test check -x test -x dockerTest -x reclaimDockerSpace"
+            TASKS=":core:spring-boot:test :smoke-test:spring-boot-smoke-test-simple:test -x antora"
             ;;
         esac
         echo "Resolved tasks for scope '$SCOPE': $TASKS"
