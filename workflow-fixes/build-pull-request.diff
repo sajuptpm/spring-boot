@@ -1,0 +1,29 @@
+diff --git a/.github/workflows/build-pull-request.yml b/.github/workflows/build-pull-request.yml
+index 95129fa18d7..1e2ed98c91d 100644
+--- a/.github/workflows/build-pull-request.yml
++++ b/.github/workflows/build-pull-request.yml
+@@ -1,11 +1,13 @@
+ name: Build Pull Request
+-on: pull_request
++on:
++  pull_request:
++  workflow_dispatch:
+ permissions:
+   contents: read
+ jobs:
+   build:
+     name: Build Pull Request
+-    if: ${{ github.repository == 'spring-projects/spring-boot' }}
++    if: ${{ github.repository == 'sajuptpm/spring-boot' || github.repository == 'spring-projects/spring-boot' || vars.ENABLE_PR_BUILD == 'true' }}
+     runs-on: ${{ vars.UBUNTU_MEDIUM || 'ubuntu-latest' }}
+     steps:
+       - name: Check Out Code
+@@ -13,6 +15,8 @@ jobs:
+       - name: Build
+         id: build
+         uses: ./.github/actions/build
++        with:
++          develocity-access-key: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+       - name: Print JVM Thread Dumps When Cancelled
+         if: cancelled()
+         uses: ./.github/actions/print-jvm-thread-dumps
