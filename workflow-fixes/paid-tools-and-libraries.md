@@ -5,7 +5,8 @@
 This document provides a comprehensive, evidence-verified inventory, architectural analysis, and cost-benefit breakdown of all:
 1. **Paid & Licensed Tools and Libraries (Before vs After Code Changes)**
 2. **External Infrastructure, Paid Compute Runners, and Cloud Services**
-3. **External GitHub Projects Cloned, Dispatched, and Used**
+3. **Vendor Restriction Risk, Impact & Architectural Mitigation Matrix**
+4. **External GitHub Projects Cloned, Dispatched, and Used**
 
 utilized across the 15 GitHub Actions workflow pipelines in the Spring Boot repository.
 
@@ -81,7 +82,27 @@ The table below catalogs every actual tool and library used in the workflow befo
 
 ---
 
-## 5. Open-Source Release Architecture & Blueprint (GitHub Enterprise Public Repo)
+## 5. Vendor Restriction Risk, Impact & Architectural Mitigation Matrix
+
+The table below catalogs every vendor-restricted tool, library, infrastructure, and test runner in upstream Spring Boot, evaluating the technical impact on a forked repository, the associated risk, the mitigation implemented in code, the permanent architectural solution, and the verified code evidence.
+
+| # | Pipeline / Workflow Name | Restricted Component & Vendor | Restriction Type / Root Cause | Description & Purpose in Pipeline | Impact on Forked Repo (Before Changes) | Risk Category & Severity | Mitigation Implemented in Code | Permanent Solution (Public OSS Model) | Residual Risk | Code Evidence in Fork |
+| :-: | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **1** | **`verify.yml`** | **Broadcom Release Verification Test (RVT) Suite** *(Broadcom Inc.)* | Private GitHub repository (`spring-projects/spring-boot-release-verification`) returning HTTP 404 to non-Broadcom accounts. | End-to-end sanity tests validating that staged Maven artifacts can be resolved and run by downstream consumer apps. | Step `Check Out Release Verification Tests` crashes immediately with `fatal: repository not found` (HTTP 404), blocking release verification. | **Release Blocker**<br>Severity: **High** | Added `resolve-mode` step checking repo HTTP status via `curl` to GitHub API. If HTTP 404, mode automatically switches to `native`. | Executes built-in Spring Boot Simple Smoke Tests (`./gradlew :smoke-test:spring-boot-smoke-test-simple:test`) validating starter resolution and framework initialization locally. | **Low**: Built-in smoke tests cover startup and starter resolution, but custom proprietary 3rd-party integration scenarios from Broadcom's private suite are omitted. | `.github/workflows/verify.yml`:<br>• Lines 48-68 (`resolve-mode`)<br>• Lines 86-105 (`native` smoke tests) |
+| **2** | **`build-and-deploy-snapshot.yml`** | **JFrog Artifactory Enterprise SaaS** *(`repo.spring.io`, JFrog Ltd.)* | Proprietary write credentials (`ARTIFACTORY_USERNAME` / `PASSWORD`) restricted to Broadcom staff; upstream hardcoded repo checks. | Publishes daily and nightly snapshot JARs and build-info metadata to external repository server. | Step `Deploy to Artifactory` (`spring-io/artifactory-deploy-action`) crashes with HTTP 401 Unauthorized; snapshots fail to deploy. | **Deployment Failure**<br>Severity: **High** | Added `deploy-config` step evaluating secret presence; sets `has_artifactory=false` if credentials are empty and enables `workflow_dispatch`. | Automatically falls back to **GitHub Releases (`gh release create --prerelease`)** and **GitHub Packages (`maven.pkg.github.com`)**, providing free public distribution. | **Negligible**: Downstream consumers resolve snapshots from GitHub Packages or download from GitHub Releases. | `.github/workflows/build-and-deploy-snapshot.yml`:<br>• Lines 27-46 (`deploy-config`)<br>• Lines 48-64 (`Deploy to GitHub Release`) |
+| **3** | **`publicize-release.yml`** | **JFrog Artifactory CLI Token & Broadcom Homebrew Tap** *(JFrog Ltd. / Broadcom Inc.)* | Proprietary Artifactory token `JF_ARTIFACTORY_SPRING`; restricted write access to `spring-io/homebrew-tap`; `COMMERCIAL=true` gating. | Final GA release workflow: publishes Gradle plugins, updates Homebrew CLI formula, and creates GitHub Release notes. | `publish-gradle-plugin` fails without Artifactory token; `update-homebrew-tap` fails with Git 403 Forbidden; release publicization halts. | **Release Publicization Failure**<br>Severity: **Critical** | Added `workflow_dispatch` manual trigger with explicit inputs; made plugin step resilient; added fallback asset uploader step. | Releases publish to **Maven Central via Sonatype Central Portal**, binaries upload to **GitHub Releases (`gh release upload`)**, Homebrew updates custom public org tap, and plugin publishes to **Gradle Plugin Portal**. | **Low**: Requires one-time free registration on Sonatype Central and Gradle Plugin Portal. | `.github/workflows/publicize-release.yml`:<br>• Lines 1-25 (`workflow_dispatch`)<br>• Lines 76-88 (`Attach Built Assets to GA Release`) |
+| **4** | **`publicize-milestone.yml`** | **JFrog Artifactory Milestone Staging** *(JFrog Ltd.)* | Restricted promotion permissions on `repo.spring.io/libs-milestone-local`. | Publicizes milestone releases (M1, M2) and release candidates (RC1, RC2) for community testing. | Milestone staging fails due to missing Artifactory promotion credentials. | **Milestone Deployment Failure**<br>Severity: **Medium** | Added `workflow_dispatch` manual trigger with milestone auto-detection; added asset upload step. | Publishes pre-releases directly to **GitHub Releases (`gh release create --prerelease`)** with milestone changelogs. | **Negligible**: Full milestone distribution maintained via GitHub Releases. | `.github/workflows/publicize-milestone.yml`:<br>• Lines 1-25 (`workflow_dispatch`)<br>• Lines 55-66 (`Attach Plugin & Docs Assets to Release`) |
+| **5** | **`release-train-build.yml`** | **Enterprise Compute Labels & Release Train Orchestrator** *(Broadcom Inc.)* | Custom runner label `ubuntu22-2-8`; `spring-io/release-train` token restricted; re-run prevention policy. | Multi-module compilation, packaging, and synchronization of Spring release train candidates. | Fails immediately with `no runner matches labels ubuntu22-2-8`, or crashes at callback step with HTTP 401, or aborts re-runs. | **Pipeline Execution Failure**<br>Severity: **Critical** | Parametrized runner label: `runs-on: ${{ vars.UBUNTU_MEDIUM || 'ubuntu-latest' }}`; added `RELEASE_TRAIN_ALLOW_RERUNS=true` check. | Implemented **Standalone Mode (`callback: none`)**; bypasses external orchestrator API dispatches, compiling release publications locally on free standard `ubuntu-latest` runners. | **Low**: Operates autonomously for single-repo releases rather than multi-project synchronized train. | `.github/workflows/release-train-build.yml`:<br>• Line 28 (`runs-on`)<br>• Lines 39-44 (re-run bypass)<br>• Lines 87-99 (conditional callback) |
+| **6** | **`release-train-test.yml`** | **High-Memory Runner Image & Heavyweight Antora Docs** *(Broadcom Inc.)* | Custom runner label `ubuntu22-4-16`; 16GB RAM demand triggers OOM on standard 7GB GitHub runners; orchestrator token missing. | Full release candidate test suite execution to verify framework stability before GA. | Runner queuing failure, or Out-Of-Memory (OOM) killer aborting Gradle test daemon, or callback 401 crash. | **Test Failure & OOM Crash**<br>Severity: **High** | Parametrized `runs-on: ${{ vars.UBUNTU_LARGE || vars.UBUNTU_MEDIUM || 'ubuntu-latest' }}`; added `jlumbroso/free-disk-space` (30GB+ disk); tuned heap (`-Xmx4g`). | Added `test-scope` filter (`TASKS="build -x dockerTest -x reclaimDockerSpace -x antora"`) to decouple heavy Antora site rendering from tests, running cleanly on standard free `ubuntu-latest`. | **Low**: Heavy Docker system tests run in dedicated `run-system-tests.yml` pipeline. | `.github/workflows/release-train-test.yml`:<br>• Line 28 (`runs-on`)<br>• Lines 52-65 (task scoping & Antora exclusion) |
+| **7** | **`release-train-join / leave / ready / retry`** | **Release Train Central Coordinator** *(Broadcom Inc.)* | Restricted write permissions on `spring-io/release-train` orchestrator repo. | Synchronizes release lifecycle events, branch states, and staging version manifests. | Pipeline fails on `gh workflow run` dispatch with `Resource not accessible by integration` (HTTP 403). | **Workflow Crash**<br>Severity: **Medium** | Added conditional evaluation: skips dispatch when `callback: none` or token is absent. | Operates in **Standalone Manifest Mode**, logging status cards directly to GitHub Actions Job Summaries without requiring external coordinators. | **Negligible**: Fully autonomous forked repository release flow. | `.github/workflows/release-train-join.yml`, `leave.yml`, `ready.yml`, `retry.yml` |
+| **8** | **`trigger-docs-build.yml`** | **External Docs Repository** *(Broadcom Inc.)* | Hardcoded condition `if: github.repository_owner == 'spring-projects'` targeting `spring-projects/spring-boot-docs`. | Dispatches documentation site rebuild on dedicated Antora docs repository. | Job skipped completely on all forks, leaving documentation unbuilt and unpublished. | **Missing Documentation**<br>Severity: **Medium** | Dual-mode resolution: checks if repository owner is `spring-projects`; if running on fork, switches to `mode: native`. | Executes local Antora documentation build (`./gradlew antora`), packaging HTML/PDF outputs into `spring-boot-<version>-docs.zip` attached directly to the GitHub Release. | **Low**: Docs distributed via Release ZIP bundles rather than hosted live on `docs.spring.io`. | `.github/workflows/trigger-docs-build.yml`:<br>• Lines 28-36 (mode resolution)<br>• Lines 45-72 (native docs build) |
+| **9** | **`ci.yml` & `build-pull-request.yml`** | **Gradle Develocity Server & Upstream Repo Filter** *(Gradle Inc. / Broadcom Inc.)* | Upstream filter `if: github.repository == 'spring-projects/spring-boot'`; private `ge.spring.io` access key. | Main continuous integration workflow executing multi-module Gradle compilation and matrix tests (Linux + Windows). | Upstream CI never triggers on forks due to repo name checks; fails if Develocity key is treated as mandatory. | **Unvalidated Code & Regressions**<br>Severity: **High** | Added fork repository name (`sajuptpm/spring-boot`) and `workflow_dispatch` manual trigger; decoupled notification step. | Uses `gradle/actions/setup-gradle` for **GitHub Actions Cache (`actions/cache`)** at $0; build summaries output to GitHub UI; runs on free standard Linux & Windows runners. | **Negligible**: 100% verified and functional on both Linux and Windows. | `.github/workflows/ci.yml`:<br>• Line 11 (repo expression)<br>• Lines 50-60 (notification fallback) |
+| **10** | **`run-system-tests.yml`** | **Docker Hub Anonymous IP Rate Limiting** *(Docker Inc.)* | Docker Hub limits unauthenticated IP pulls to 100 pulls/6hr; shared GitHub runner IPs frequently throttled. | Executes integration tests pulling 11+ real database and messaging broker containers (Postgres, Oracle, MS SQL, Redis, Kafka, etc.). | Testcontainers fails during container pull with `toomanyrequests: You have reached your unauthenticated pull rate limit`. | **Flaky System Tests**<br>Severity: **Medium** | Configured Docker daemon with `overlay2` storage driver; added runner disk space cleanup; added optional authenticated Docker Hub secrets. | Uses free authenticated Docker Hub account (200 pulls/6hr) or mirror images to GitHub Container Registry (`ghcr.io`) at zero cost. | **Low**: Free authenticated Docker Hub account eliminates throttling. | `.github/workflows/run-system-tests.yml`:<br>• Lines 21-25 (`Switch Docker to Overlay2`)<br>• Lines 30-36 |
+| **11** | **`run-codeql-analysis.yml`** | **GitHub Advanced Security (GHAS) Seat Licensing** *(GitHub / Microsoft)* | GHAS costs $49/committer/mo on private enterprise repos. | Static Application Security Testing (SAST) scanning for Java vulnerabilities. | On private enterprise repositories, security scanning consumes paid committer licenses. | **Compliance & Cost Risk**<br>Severity: **Medium** | Maintained active workflow and verified live on public repository. | **Hosting as a Public Repository under GitHub Enterprise makes GitHub Advanced Security (CodeQL SAST, Dependabot, Secret Scanning) 100% FREE** with unlimited scans. | **None**: Live-tested and verified. | `.github/workflows/run-codeql-analysis.yml`:<br>• Line 13 |
+
+---
+
+## 6. Open-Source Release Architecture & Blueprint (GitHub Enterprise Public Repo)
 
 When releasing Spring Boot as an open-source project from a **public repository under GitHub Enterprise**, every commercial upstream dependency translates directly into a zero-cost open-source equivalent:
 
@@ -144,7 +165,7 @@ When releasing Spring Boot as an open-source project from a **public repository 
 
 ---
 
-## 6. Total Cost of Ownership (TCO) Architectural Comparison
+## 7. Total Cost of Ownership (TCO) Architectural Comparison
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -171,7 +192,7 @@ When releasing Spring Boot as an open-source project from a **public repository 
 └──────────────────────────────────────┬──────────────────────────────────────┘
                                        │
 ┌──────────────────────────────────────▼──────────────────────────────────────┐
-│ Architecture Model C: Open-Source Release on Public Repo (YOUR TARGET MODEL)│
+│ Architecture Model C: Open-Source Release on Public Repo (AFTER YOUR CHANGES)│
 │ • Artifacts: Maven Central (Sonatype OSSRH) & GH Packages:    $0.00         │
 │ • Releases: Native GitHub Releases (ZIPs, CLI binaries):      $0.00         │
 │ • Build Caching: actions/cache & Gradle setup-gradle:         $0.00         │
@@ -187,7 +208,7 @@ When releasing Spring Boot as an open-source project from a **public repository 
 
 ---
 
-## 7. Open-Source Release Setup & Execution Checklist ($0.00 Cost)
+## 8. Open-Source Release Setup & Execution Checklist ($0.00 Cost)
 
 To execute open-source builds and releases from your public fork repository, complete this simple zero-cost setup:
 
@@ -207,7 +228,7 @@ To execute open-source builds and releases from your public fork repository, com
 
 ### 3. Gradle Plugin Distribution (Optional)
 * [ ] If distributing the `org.springframework.boot` Gradle plugin to the community:
-  * Register a free publisher account on [plugins.gradle.org](https://plugins.gradle.org).
+  * Register a free publisher account on [plugins.gradle.org](plugins.gradle.org).
   * Add secrets: `GRADLE_PUBLISH_KEY` and `GRADLE_PUBLISH_SECRET`.
 
 ### 4. Homebrew CLI Tap (Optional)
