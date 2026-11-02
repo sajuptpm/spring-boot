@@ -1,10 +1,11 @@
-# Spring Boot Pipelines: Paid Tools, External Infrastructure & Cloud Assessment
+# Spring Boot Pipelines: Paid Tools, External Infrastructure, Cloud & GitHub Projects Assessment
 
 ## 1. Executive Summary
 
 This document provides a comprehensive inventory, architectural analysis, and cost-benefit breakdown of all:
-1. **Paid & Licensed Tools and Libraries**
+1. **External GitHub Projects Cloned, Dispatched, and Used**
 2. **External Infrastructure, Paid Compute Runners, External Infra Setups, and External Cloud Services**
+3. **Paid & Licensed Tools and Libraries**
 
 utilized across the 15 GitHub Actions workflow pipelines in the Spring Boot repository.
 
@@ -14,7 +15,29 @@ While upstream Spring Boot (managed by Broadcom / VMware Tanzu) integrates deepl
 
 ---
 
-## 2. Consolidated Master Table: External Infrastructure, Paid Runners & Cloud Services
+## 2. Consolidated Master Table: External GitHub Projects Cloned & Used in Pipelines
+
+| # | GitHub Project Name | Project Type / Category | Pipelines / Workflows Used | Description & Specific Use in Pipeline | Vendor / Maintainer | License | Interaction Mechanism | Access Requirement | Fork Strategy / Alternative |
+| :-: | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **1** | **`spring-projects/spring-boot-release-verification`** | Proprietary Release Test Suite | • `verify.yml`<br>• `build-and-deploy-snapshot.yml` | **Release Verification Test (RVT) Suite**: Cloned via `actions/checkout` (ref: `v0.0.15`, path: `external-rvt`) to run end-to-end sanity tests verifying that staged artifacts in Artifactory can be resolved by downstream consumers. | Broadcom Inc. (Spring Projects) | Proprietary Broadcom Internal / Partner License | `git clone` via `actions/checkout` | **Private** *(Requires GitHub PAT with `repo` read access)* | **Built-in Simple Smoke Tests** (`:smoke-test:spring-boot-smoke-test-simple:test`) automatically executes when repo returns HTTP 404. |
+| **2** | **`spring-io/homebrew-tap`** *(also referenced as `spring-projects/homebrew-tap`)* | Package Distribution Tap | • `publicize-release.yml` *(via `update-homebrew-tap` action)* | **Spring Boot CLI Homebrew Tap**: Cloned to update the `spring-boot.rb` formula with the newly published CLI binary ZIP and SHA-256 checksum from Maven Central, committing and pushing updates directly to GitHub. | Broadcom Inc. (Spring I/O) / Homebrew | Apache License 2.0 | `git clone` & `git push` via `actions/checkout` | **Restricted Write** *(Requires PAT with write access to tap repo)* | **Custom Enterprise Homebrew Tap** (e.g. `<org>/homebrew-tap`) or direct ZIP distribution via GitHub Releases. |
+| **3** | **`spring-io/release-train`** | Release Orchestrator & Manifest | • `release-train-join.yml`<br>• `release-train-build.yml`<br>• `release-train-leave.yml`<br>• `release-train-ready.yml`<br>• `release-train-retry.yml`<br>• `release-train-test.yml` | **Spring Release Train Orchestrator**: Central orchestrator coordinating multi-project releases across the Spring portfolio. Pipelines send `gh workflow run` dispatch events to synchronize build versions, staging repositories, and release status. | Broadcom Inc. (Spring I/O) | Apache License 2.0 | GitHub API / `gh workflow run` dispatch | **Restricted Write** *(Requires `RELEASE_TRAIN_PARTICIPANT_GITHUB_TOKEN`)* | **Standalone Mode (`callback: none`)**: Operates independently for single-repo releases without external coordination. |
+| **4** | **`spring-projects/spring-boot-docs`** | Documentation Site Repository | • `trigger-docs-build.yml`<br>• `build-and-deploy-snapshot.yml`<br>• `publicize-milestone.yml`<br>• `publicize-release.yml` | **Decoupled Reference Documentation Site**: External repository compiling and hosting Antora-based documentation. Triggered via `gh workflow run deploy-docs.yml -r docs-build` to rebuild documentation on Antora asset updates. | Broadcom Inc. (Spring Projects) | Apache License 2.0 | GitHub API `repository_dispatch` / `gh workflow run` | **Restricted Write** *(Requires PAT with dispatch permissions)* | **Local Antora Documentation Build** or bundling docs directly into distribution ZIPs (`spring-boot-<version>-docs.zip`). |
+| **5** | **`spring-io/antora-ui-spring`** | Documentation UI Bundle | • Referenced in documentation generation (`trigger-docs-build.yml`) | **Antora UI Theme & Layout Template**: Provides CSS, JavaScript, and navigation header templates defining the visual look-and-feel of official Spring documentation websites. | Broadcom Inc. (Spring I/O) | Mozilla Public License 2.0 (MPL-2.0) | Cloned / downloaded during Antora site build | **Public** *(Open Source)* | Can be cloned freely or replaced with corporate enterprise documentation themes. |
+| **6** | **`spring-io/artifactory-deploy-action`** | Deployment GitHub Action | • `build-and-deploy-snapshot.yml` | **Artifactory Multithreaded Publisher**: Custom action (`spring-io/artifactory-deploy-action@v0.0.6`) uploading Maven deployment folders, POMs, and signed JARs to JFrog Artifactory with build-info metadata. | Broadcom Inc. (Spring I/O) | Apache License 2.0 | `uses: spring-io/artifactory-deploy-action@...` | **Public** *(Open Source)* | Active fallback to **GitHub Releases (`gh release create`)** and **GitHub Packages** when Artifactory is not configured. |
+| **7** | **`spring-io/github-changelog-generator`** | Release Tooling Action | • `publicize-milestone.yml`<br>• `publicize-release.yml` *(via `create-github-release` action)* | **Automated Milestone Changelog Generator**: Custom action (`spring-io/github-changelog-generator@v0.0.14`) that queries GitHub API for milestone issues/PRs and formats release notes into categorized sections. | Broadcom Inc. (Spring I/O) | Apache License 2.0 | `uses: spring-io/github-changelog-generator@...` | **Public** *(Open Source)* | Fully functional in forks using repository `GITHUB_TOKEN` to generate changelogs from internal milestones. |
+| **8** | **`spring-io/github-actions`** | Shared Reusable Workflows | • `run-codeql-analysis.yml` | **Enterprise Reusable Workflow Repository**: Upstream workflow calls `uses: spring-io/github-actions/.github/workflows/codeql-analysis.yml` to execute standardized CodeQL static security analysis. | Broadcom Inc. (Spring I/O) | Apache License 2.0 | `uses: <owner>/<repo>/.github/workflows/...` | **Public** *(Open Source)* | Fully functional; or use standard inline `github/codeql-action` steps directly. |
+| **9** | **`gradle/actions` (`setup-gradle`)** | Build Tool GitHub Action | • `ci.yml`<br>• `build-pull-request.yml`<br>• `verify.yml`<br>• `.github/actions/prepare-gradle-build` | **Gradle Environment & Cache Action**: Configures Gradle build environment, validates wrapper binaries, injects Develocity access keys, caches dependencies, and generates Actions Job Summaries. | Gradle Inc. | Apache License 2.0 | `uses: gradle/actions/setup-gradle@...` | **Public** *(Open Source)* | Fully functional in all environments; handles both cached and non-cached builds. |
+| **10** | **`Homebrew/actions` (`setup-homebrew`)** | Package Manager Action | • `verify.yml` | **Homebrew Setup Action**: Installs and configures Homebrew on macOS/Linux runners (`Homebrew/actions/setup-homebrew`) during release verification to test CLI formula installations. | Homebrew Project | BSD 2-Clause License | `uses: Homebrew/actions/setup-homebrew@...` | **Public** *(Open Source)* | Used in verification original mode; skipped when running in native smoke test mode. |
+| **11** | **`jlumbroso/free-disk-space`** | Runner Utility Action | • `release-train-test.yml`<br>• `.github/actions/prepare-gradle-build` | **Runner Storage Cleaner**: Removes pre-installed toolchains (Android SDKs, .NET, Haskell, swap space) from standard GitHub runner images to free up 30GB+ of disk space for heavy builds and Docker images. | Jonathan Lumbroso (Community OSS) | MIT License | `uses: jlumbroso/free-disk-space@...` | **Public** *(Open Source)* | Essential utility for preventing runner disk exhaustion on standard GitHub runners. |
+| **12** | **`jfrog/setup-jfrog-cli`** | CLI Installer Action | • `.github/actions/publish-gradle-plugin` *(called by `publicize-release.yml`)* | **JFrog CLI Bootstrap Action**: Installs and authenticates the JFrog CLI tool on the runner to download pre-staged Gradle plugin binaries from Artifactory prior to publishing. | JFrog Ltd. | Apache License 2.0 | `uses: jfrog/setup-jfrog-cli@...` | **Public** *(Open Source)* | Used only when publishing plugins from Artifactory; can be bypassed if publishing directly from Gradle. |
+| **13** | **`actions/checkout`** | Core Official Action | • Used across almost all 15 workflows | **Git Repository Checkout**: Clones repository branches, tags, submodules, and secondary repos (like `external-rvt` or `homebrew-tap`) into runner workspace. | GitHub (Microsoft) | MIT License | `uses: actions/checkout@...` | **Public** *(Open Source)* | Official standard action, fully supported. |
+| **14** | **`actions/setup-java`** | Core Official Action | • `ci.yml`<br>• `build-and-deploy-snapshot.yml`<br>• `verify.yml`<br>• `prepare-gradle-build` | **Java Toolchain Action**: Downloads, installs, and configures OpenJDK 25 toolchains (Liberica / Temurin distributions) with `JAVA_HOME` configuration. | GitHub (Microsoft) | MIT License | `uses: actions/setup-java@...` | **Public** *(Open Source)* | Official standard action, fully supported. |
+| **15** | **`actions/upload-artifact` & `actions/download-artifact`** | Core Official Action | • `build-and-deploy-snapshot.yml`<br>• `publicize-milestone.yml`<br>• `publicize-release.yml`<br>• `release-train-*.yml` | **Workflow Artifact Storage**: Uploads and downloads build artifacts (ZIP archives, test reports, distributions) across decoupled workflow jobs. | GitHub (Microsoft) | MIT License | `uses: actions/upload-artifact@...`<br>`uses: actions/download-artifact@...` | **Public** *(Open Source)* | Official standard action, fully supported. |
+
+---
+
+## 3. Consolidated Master Table: External Infrastructure, Paid Runners & Cloud Services
 
 | # | Infrastructure / Cloud Component | Category / Tier | Pipelines / Workflows Used | Description & Specific Use in Pipeline | Vendor / Provider | License / Terms | Subscription Model | Estimated Rough Cost | Required Setup & Configuration | Required for Fork? | Free / Open-Source Alternative |
 | :-: | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :---: | :--- |
@@ -31,7 +54,7 @@ While upstream Spring Boot (managed by Broadcom / VMware Tanzu) integrates deepl
 
 ---
 
-## 3. Consolidated Master Table: Paid & Licensed Tools and Libraries
+## 4. Consolidated Master Table: Paid & Licensed Tools and Libraries
 
 | # | Tool / Library Name | Pipelines / Workflows Used | Description & Specific Use in Pipeline | Vendor | License Type | Subscription Model | Estimated Rough Cost | Required for Fork? | Free / Open-Source Alternative |
 | :-: | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :---: | :--- |
@@ -44,56 +67,6 @@ While upstream Spring Boot (managed by Broadcom / VMware Tanzu) integrates deepl
 | **7** | **Commercial Code Signing Certificates (EV / Cloud HSM)** | • `publicize-release.yml`<br>• `build-and-deploy-snapshot.yml` | **Cryptographic Software Provenance**: Signs Java JARs, POMs, and CLI native executables to prevent OS security warnings (SmartScreen) and meet Maven Central publication rules. | DigiCert / Sectigo / AWS / GCP / Azure | Commercial PKI / Cloud KMS License | Annual certificate fee or cloud KMS consumption per key/operation | **GPG / PGP:** **$0 (100% Free)**<br>**Cloud KMS:** ~$1 – $10 / mo<br>**EV Code Signing Cert:** ~$400 – $700 / year | **Optional** *(PGP is free; EV only for CLI binaries)* | **Standard OpenPGP / GPG Keypair** *(100% Free, accepted by Maven Central)*<br>**Sigstore / Cosign** *(Free keyless signing)* |
 | **8** | **Broadcom Release Verification Test (RVT) Suite** | • `verify.yml`<br>• `build-and-deploy-snapshot.yml` | **Proprietary Ecosystem Verification Test Suite**: Clones and executes external release verification tests against staging repositories from `spring-projects/spring-boot-release-verification`. | Broadcom Inc. | Proprietary Internal / Partner License | Bundled with Broadcom enterprise partnerships (not sold standalone) | Proprietary contract agreement | **No** *(Replaced by built-in smoke tests)* | **Spring Boot Simple Smoke Tests** (`:smoke-test:spring-boot-smoke-test-simple:test`) *(Built-in)*<br>**Internal Enterprise Test Suite** |
 | **9** | **Gradle Plugin Portal Publisher** | • `publicize-milestone.yml`<br>• `publicize-release.yml` | **Public Plugin Distribution**: Publishes the `org.springframework.boot` Gradle build plugin to the global Gradle Plugin Portal (`plugins.gradle.org`). | Gradle Inc. | Terms of Service (Free OSS with commercial hosting options) | Free for public plugins; commercial hosting via Artifactory/Nexus | **Public:** **$0 (Free)**<br>**Internal:** Covered under Artifactory/Nexus license | **No** *(Unless publishing to public portal)* | **Internal Maven / Gradle Repo** *(GitHub Packages or Nexus OSS)* |
-
----
-
-## 4. Deep-Dive: Infrastructure Architecture & Setup Requirements
-
-### 4.1 Compute Runner Tiering & Sizing Architecture
-* **Upstream Configuration**: Upstream assigns jobs using repository variables:
-  * `runs-on: ${{ vars.UBUNTU_MEDIUM }}` (4-core, 16GB RAM)
-  * `runs-on: ${{ vars.UBUNTU_LARGE }}` (8-core, 32GB RAM)
-  * `runs-on: windows-latest`
-* **Why Upstream Needed Larger Compute**:
-  * Spring Boot compiles over 150 submodules with full annotation processors, generating extensive bytecode and Javadoc bundles.
-  * System tests (`run-system-tests.yml`) spin up 11+ heavy database containers in parallel using Testcontainers, requiring at least 8GB of free RAM to prevent the Linux kernel OOM killer (`kill -9`) from terminating Gradle test workers.
-* **Fork Adaptation**:
-  * All workflows in our fork implement dynamic fallback resolution: `${{ vars.UBUNTU_MEDIUM || 'ubuntu-latest' }}`.
-  * Workflows run cleanly on standard included GitHub runners by tuning Gradle JVM heap settings (`-Xmx3g`) and sequentializing container execution.
-
----
-
-### 4.2 External Artifact Repository Setup (JFrog Artifactory vs. Alternatives)
-* **Required External Setup**:
-  * An enterprise JFrog Artifactory instance with three dedicated Maven repositories:
-    1. Snapshot target: `libs-snapshot-local`
-    2. Milestone staging target: `libs-milestone-local`
-    3. Production GA release target: `libs-release-local`
-  * Networking: Outbound HTTPS (Port 443) access from GitHub runner IP ranges to the Artifactory domain.
-  * Secrets: `ARTIFACTORY_USERNAME`, `ARTIFACTORY_PASSWORD`, `ARTIFACTORY_DEPLOY_REPO_URL`.
-* **Zero-Cost Fork Alternative**:
-  * Our fork automatically checks if `secrets.ARTIFACTORY_USERNAME` is populated.
-  * If omitted, it packages all build outputs into `spring-boot-<version>-snapshot.zip` and deploys directly to **GitHub Releases** and **GitHub Packages**, requiring **zero external cloud infrastructure**.
-
----
-
-### 4.3 Container Infrastructure & Registry Networking
-* **Required External Setup**:
-  * Docker Engine 24.0+ running on the host runner with `/var/run/docker.sock` mounted.
-  * Docker Hub credentials (`DOCKERHUB_USERNAME`, `DOCKERHUB_PASSWORD`) configured to prevent hitting Docker Hub's anonymous rate limit of 100 pulls per 6 hours.
-* **Storage Footprint**:
-  * Pre-pulling container images for PostgreSQL, MySQL, MariaDB, Oracle-Free, MS SQL, Neo4j, Cassandra, MongoDB, Redis, RabbitMQ, and Kafka consumes approximately **18 GB to 25 GB of disk space**.
-  * On GitHub-hosted runners, a pre-flight disk cleanup step removes unused Android SDKs and .NET runtimes to free up 30GB+ of runner disk space.
-
----
-
-### 4.4 Cryptographic Key Management & Release Signing
-* **Required External Setup**:
-  * An ASCII-armored OpenPGP private key registered with public keyservers (`keys.openpgp.org`, `pgp.mit.edu`).
-  * For enterprise compliance, keys can be stored inside **Cloud KMS / CloudHSM** (AWS KMS, Azure Key Vault, Google Cloud KMS) where signing operations are performed via REST API without exposing raw private keys.
-* **Secrets Configuration**:
-  * `GPG_PRIVATE_KEY`: Raw ASCII-armored private key string.
-  * `GPG_PASSPHRASE`: Password decrypting the private key during Gradle `sign` tasks.
 
 ---
 
@@ -138,17 +111,20 @@ While upstream Spring Boot (managed by Broadcom / VMware Tanzu) integrates deepl
 
 ## 6. Enterprise Procurement & Infrastructure Setup Checklist
 
-Before triggering production enterprise releases, review which infrastructure capabilities your organization requires:
+Before triggering production enterprise releases, review which infrastructure and external repository capabilities your organization requires:
 
-1. **Compute & Runner Infrastructure**:
+1. **External Repository Access**:
+   - [ ] *Option 1 (Standalone Fork)*: Use default Standalone Mode (`callback: none`) and built-in smoke tests (Active Default).
+   - [ ] *Option 2 (Multi-Repo Train)*: Configure `RELEASE_TRAIN_PARTICIPANT_GITHUB_TOKEN` and point `release-train-repository` to your enterprise orchestrator repository.
+2. **Compute & Runner Infrastructure**:
    - [ ] *Option 1 (Zero Cost)*: Use standard GitHub-hosted `ubuntu-latest` and `windows-latest` runners (Active Default).
    - [ ] *Option 2 (Performance)*: Configure `vars.UBUNTU_MEDIUM` and `vars.UBUNTU_LARGE` with custom 4-core/8-core labels or deploy an on-premises Kubernetes runner cluster via Actions Runner Controller (ARC).
-2. **Artifact Repository Infrastructure**:
+3. **Artifact Repository Infrastructure**:
    - [ ] *Option 1 (Enterprise)*: Populate `ARTIFACTORY_USERNAME`, `ARTIFACTORY_PASSWORD`, and `ARTIFACTORY_DEPLOY_REPO_URL` to route deployments to corporate Artifactory/Nexus.
    - [ ] *Option 2 (GitHub Native)*: Leave Artifactory secrets empty to automatically publish release ZIP bundles to GitHub Releases and JARs to GitHub Packages.
-3. **Container Infrastructure**:
+4. **Container Infrastructure**:
    - [ ] Ensure Docker daemon is running on runners and optionally populate `DOCKERHUB_USERNAME`/`PASSWORD` to avoid anonymous IP rate limits.
-4. **Cryptographic Release Signing**:
+5. **Cryptographic Release Signing**:
    - [ ] Generate an OpenPGP keypair (`gpg --armor --export-secret-keys <ID>`) and configure `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` in GitHub Secrets.
-5. **Team Collaboration Gateways**:
+6. **Team Collaboration Gateways**:
    - [ ] Populate `GOOGLE_CHAT_WEBHOOK_URL` (or configure a Slack/Discord incoming webhook) for real-time build and release status cards.
