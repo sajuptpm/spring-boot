@@ -1,110 +1,114 @@
-# Spring Boot Pipelines: Paid & Licensed Tools, Services, and Infrastructure Assessment
+# Spring Boot Pipelines: Paid Tools, External Infrastructure & Cloud Assessment
 
 ## 1. Executive Summary
 
-This document provides a comprehensive inventory and cost-benefit analysis of all **paid, commercial, licensed, and metered tools, services, and infrastructure components** utilized across the 15 GitHub Actions workflow pipelines in the Spring Boot repository.
+This document provides a comprehensive inventory, architectural analysis, and cost-benefit breakdown of all:
+1. **Paid & Licensed Tools and Libraries**
+2. **External Infrastructure, Paid Compute Runners, External Infra Setups, and External Cloud Services**
 
-While upstream Spring Boot (managed by Broadcom / VMware Tanzu) integrates deeply with proprietary enterprise SaaS and private infrastructure, our forked repository has implemented a **Dual-Mode Architecture**:
-1. **Commercial / Enterprise Mode**: If enterprise credentials (Artifactory, Develocity, GPG keys, Google Chat webhooks) are configured in GitHub Secrets, pipelines run natively against enterprise systems.
-2. **Zero-Cost GitHub-Native Mode**: In the absence of paid enterprise subscriptions, pipelines automatically fall back to 100% free, GitHub-native equivalents (GitHub Packages, GitHub Releases, built-in smoke tests, standard runners) at **$0 licensing cost**.
+utilized across the 15 GitHub Actions workflow pipelines in the Spring Boot repository.
+
+While upstream Spring Boot (managed by Broadcom / VMware Tanzu) integrates deeply with proprietary enterprise SaaS, external cloud infrastructure, and private repositories, our forked repository implements a **Dual-Mode Architecture**:
+* **Commercial / Enterprise Production Mode**: If enterprise credentials (Artifactory, Develocity, GPG keys, Google Chat webhooks, custom runner labels) are populated, the pipelines execute against enterprise cloud infrastructure.
+* **Zero-Cost GitHub-Native Mode**: In the absence of paid enterprise subscriptions or external cloud setups, the pipelines automatically fall back to 100% free, GitHub-native equivalents (GitHub Packages, GitHub Releases, built-in smoke tests, standard runners) at **$0 infrastructure and licensing cost**.
 
 ---
 
-## 2. Consolidated Master Table of Paid / Licensed Dependencies
+## 2. Consolidated Master Table: External Infrastructure, Paid Runners & Cloud Services
+
+| # | Infrastructure / Cloud Component | Category / Tier | Pipelines / Workflows Used | Description & Specific Use in Pipeline | Vendor / Provider | License / Terms | Subscription Model | Estimated Rough Cost | Required Setup & Configuration | Required for Fork? | Free / Open-Source Alternative |
+| :-: | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :---: | :--- |
+| **1** | **GitHub Larger Linux Compute Runners (`UBUNTU_MEDIUM`)** | Paid Runner / Cloud Compute (4 vCPU, 16 GB RAM) | • `release-train-build.yml`<br>• `ci.yml` *(Linux)*<br>• `run-system-tests.yml`<br>• `build-and-deploy-snapshot.yml`<br>• `build-pull-request.yml`<br>• `release-train-join.yml`<br>• `release-train-leave.yml`<br>• `release-train-ready.yml`<br>• `release-train-retry.yml` | **Mid-Tier VM Compute**: Prevents memory exhaustion and execution timeouts during parallel Gradle multi-module compilation, heavy unit tests, and multi-container Testcontainers execution. | GitHub (Microsoft) / Azure | Commercial Cloud Compute | Metered pay-as-you-go per runner minute | ~$0.016 / min (~$0.96 / hr)<br>*Monthly Est: ~$200 – $600 / mo* | Set repository variable `vars.UBUNTU_MEDIUM` in GitHub Settings. | **No** *(Standard runners succeed with tuning)* | **Standard GitHub-hosted `ubuntu-latest`** *(Included in plan quota)*<br>**Self-Hosted Linux Runner** on existing bare-metal / VM |
+| **2** | **GitHub Heavyweight Linux Runners (`UBUNTU_LARGE`)** | Paid Runner / Heavy Compute (8 vCPU, 32 GB RAM) | • `release-train-test.yml` | **High-Memory Compute VM**: Required for full-portfolio integration tests and end-to-end framework verification across multi-project Spring modules to prevent GC thrashing and timeouts. | GitHub (Microsoft) / Azure | Commercial Cloud Compute | Metered pay-as-you-go per runner minute | ~$0.032 / min (~$1.92 / hr)<br>*Monthly Est: ~$300 – $800 / mo* | Set repository variable `vars.UBUNTU_LARGE` in GitHub Settings. | **No** *(Exclude docs task `-x antora` or tune memory)* | **Standard `ubuntu-latest`** with Gradle heap tuning (`-Xmx4g`)<br>**Dedicated Self-Hosted 8-core Runner** |
+| **3** | **GitHub-Hosted Windows Compute Runners (`windows-latest`)** | Paid Runner / Windows OS Compute (Windows Server 2022) | • `ci.yml` *(Windows matrix job)* | **Cross-Platform OS VM**: Executes full Gradle build and test suite on Windows Server to guarantee cross-platform compatibility, path separator handling, and Windows process execution. | GitHub (Microsoft) / Azure | Commercial Cloud Compute (Windows license included) | Metered pay-as-you-go per runner minute (Windows consumes 2x Linux minutes) | ~$0.016 / min (2-core) or ~$0.032 / min (4-core)<br>*Monthly Est: ~$150 – $400 / mo* | Matrix configuration `os: [ubuntu-latest, windows-latest]` in workflow YAML. | **Yes** *(Mandatory for enterprise cross-platform QA)* | **Included Free Quota** (2,000–50,000 mins/mo included in GitHub plans)<br>**Self-Hosted Windows Server VM** |
+| **4** | **Self-Hosted Kubernetes Runner Pool (Actions Runner Controller - ARC)** | External Infra Setup / Private Cloud Compute | • Applicable to all 15 workflows (`ci.yml`, `run-system-tests.yml`, `release-train-build.yml`, etc.) | **Autoscaling Private Compute**: Ephemeral container runners running inside corporate VPC/Kubernetes clusters. Keeps source code, build caches, and test artifacts behind internal enterprise firewalls. | AWS (EKS) / GCP (GKE) / Azure (AKS) / On-Premise VMware | Cloud Compute & K8s Infrastructure | Monthly cluster compute & storage billing | ~$150 – $600 / month per cluster (e.g. 2 x `c6i.2xlarge` nodes @ ~$250/mo each + K8s management fee) | Install Actions Runner Controller (ARC) Helm chart, GitHub App authentication, define `runner-scale-set` labels. | **No** *(Optional private infrastructure)* | **Default GitHub-Hosted Runners** (`ubuntu-latest`) *(Zero infrastructure maintenance)* |
+| **5** | **JFrog Artifactory Enterprise / Cloud Repository Server** | External Cloud Infra / Artifact Management | • `build-and-deploy-snapshot.yml`<br>• `release-train-build.yml`<br>• `release-train-test.yml`<br>• `publicize-milestone.yml`<br>• `publicize-release.yml`<br>• `verify.yml` | **Central Artifact Repository Server**: Enterprise Maven repository hosting snapshots (`libs-snapshot-local`), milestone staging (`libs-milestone-local`), and GA releases (`libs-release-local`), with checksum verification, RBAC, and lifecycle promotion. | JFrog Ltd. / AWS / Azure / GCP | Commercial Enterprise EULA | Monthly/Annual SaaS or BYOL Self-Hosted per instance | **Cloud Pro:** ~$98 – $150 / mo (~$1,200/yr)<br>**Enterprise X:** ~$500 – $3,000+ / mo<br>**Self-hosted VM + S3:** ~$200 – $500 / mo | HTTPS endpoint URL (`https://<corp>.jfrog.io/artifactory`), secrets `ARTIFACTORY_USERNAME`, `ARTIFACTORY_PASSWORD`, `ARTIFACTORY_DEPLOY_REPO_URL`. | **Conditional** *(Only if using Artifactory for distribution)* | **GitHub Packages (Maven)** *(Free for public repos, included in GH plans)*<br>**Sonatype Nexus OSS** *(100% Free Self-Hosted)*<br>**GitHub Releases** *(ZIP downloads)* |
+| **6** | **Gradle Enterprise / Develocity Remote Server (`ge.spring.io`)** | External Cloud Infra / Build Telemetry & Cache Server | • `ci.yml`<br>• `build-pull-request.yml`<br>• `run-system-tests.yml`<br>• `build-and-deploy-snapshot.yml`<br>• `release-train-build.yml`<br>• `release-train-test.yml` | **Centralized Remote Build Cache & Telemetry Cluster**: Stores compiled task outputs, dependency verification graphs, and build performance analytics to accelerate build times across distributed CI workers. | Gradle Inc. / AWS / GCP | Commercial Enterprise Software License | Annual committer-based license + cloud VM compute | **Software License:** ~$25,000 – $50,000+ / year<br>**Cloud Host (EC2 + 200GB SSD):** ~$150 – $300 / mo | Server URL (`https://ge.spring.io` or corporate), outbound HTTPS port 443, secret `DEVELOCITY_ACCESS_KEY`. | **No** *(Enhancement only; standard builds succeed)* | **GitHub Actions Cache (`actions/cache`)** *(Native, $0)*<br>**Public Gradle Build Scans (`scans.gradle.com`)** *(Free, single-build view)* |
+| **7** | **Docker Engine & Testcontainer Host Infrastructure** | External Infra Setup / Container Compute | • `run-system-tests.yml` | **Local Container Host & Storage**: Runs 11+ real database and messaging broker containers (Postgres, Oracle-Free, MS SQL, MySQL, MariaDB, Mongo, Neo4j, Cassandra, Redis, RabbitMQ, Kafka) concurrently during integration tests. | Docker Inc. / Cloud VM Host / Linux Foundation | Open Source (Docker CE on Linux) | Free OSS runtime; metered cloud VM compute; optional registry SaaS | **Software:** $0 (Docker CE on Linux)<br>**Host Compute/Storage:** Min 8GB RAM + 30GB SSD space on runner (~$50 – $100/mo if self-hosted)<br>**Docker Hub Team:** $9/user/mo *(to avoid IP rate limits)* | Docker daemon service active (`/var/run/docker.sock`), runner disk space cleanup, optional `DOCKERHUB_USERNAME`/`PASSWORD`. | **Yes** *(Mandatory for system tests)* | **Pre-installed Docker CE on GitHub `ubuntu-latest`** *(100% Free, zero setup)*<br>**Podman Engine** *(Rootless)* |
+| **8** | **Google Cloud Webhook Endpoint Infrastructure (`chat.googleapis.com`)** | External Cloud Service / Alerting Gateway | • `ci.yml`<br>• `build-and-deploy-snapshot.yml`<br>• `run-system-tests.yml`<br>• `verify.yml` | **Cloud Webhook Ingestion Gateway**: Cloud HTTP POST endpoint receiving JSON payload cards to broadcast build outcomes, test regressions, and release promotions to Google Chat spaces. | Google Cloud / Google Workspace | Commercial SaaS EULA | Per-user monthly Google Workspace subscription | Included in Google Workspace ($6 – $18 / user / mo); webhook network egress: $0 | Secret `GOOGLE_CHAT_WEBHOOK_URL` in format `https://chat.googleapis.com/v1/spaces/.../messages?key=...&token=...`. | **No** *(Optional notification channel)* | **Slack Incoming Webhooks** *(Free tier)*<br>**Discord Webhook** *(100% Free)*<br>**GitHub Commit Status / Check Runs** *(Native, $0)* |
+| **9** | **Cloud Key Management Service (Cloud KMS) / HSM** | External Cloud Infra / Cryptographic Key Vault | • `publicize-release.yml`<br>• `build-and-deploy-snapshot.yml` | **FIPS 140-2 Level 3 Hardware Security Module**: Secure cloud key vault for storing private PGP/GPG artifact signing keys and EV code signing keys, preventing key exfiltration during automated release execution. | AWS (KMS / CloudHSM) / GCP (Cloud KMS) / Azure (Key Vault) | Commercial Cloud KMS License | Consumption-based pay-as-you-go per key/operation | **Cloud KMS:** ~$1.00 / key / mo + $0.03 per 10k cryptographic operations (~$2 – $10 / mo)<br>**CloudHSM:** ~$1,050 / mo<br>**EV Code Signing Cert:** ~$400 – $700 / yr | Cloud IAM role / Service Principal, Key ARN / Vault URI, secrets `GPG_PRIVATE_KEY`, `GPG_PASSPHRASE`. | **Optional** *(PGP signing is mandatory for Maven Central, but keys can be stored as GH Secrets)* | **Standard OpenPGP / GPG Keypair** stored as encrypted GitHub Actions Secrets *(100% Free)*<br>**Sigstore / Cosign** *(Free keyless signing)* |
+| **10** | **External Upstream & Downstream GitHub Repositories** | External Infra Setup / Distributed Git Repos | • `release-train-*.yml` *(depends on `spring-io/release-train`)*<br>• `verify.yml` *(depends on `spring-boot-release-verification`)*<br>• `trigger-docs-build.yml` *(depends on `spring-boot-docs`)*<br>• `publicize-release.yml` *(depends on `homebrew-tap`)* | **Distributed Repository Topology**: External Git repositories that pipelines clone, query, or trigger via GitHub REST API calls and `repository_dispatch` events during coordinated release builds. | GitHub (Microsoft) / Broadcom | GitHub Enterprise Terms / Proprietary Repositories | User seats in GitHub Enterprise Cloud / Server | Public repos: $0<br>Private repos: Included in GitHub Enterprise ($21 / user / mo) | Personal Access Tokens (PATs) with `repo` and `workflow` scopes (`RELEASE_TRAIN_PARTICIPANT_GITHUB_TOKEN`, `GH_ACTIONS_REPO_TOKEN`). | **No** *(Decoupled in fork via standalone mode, smoke tests, and local docs)* | **Standalone Mode (`callback: none`)**<br>**Built-in Simple Smoke Tests**<br>**Internal Enterprise Repositories** |
+
+---
+
+## 3. Consolidated Master Table: Paid & Licensed Tools and Libraries
 
 | # | Tool / Library Name | Pipelines / Workflows Used | Description & Specific Use in Pipeline | Vendor | License Type | Subscription Model | Estimated Rough Cost | Required for Fork? | Free / Open-Source Alternative |
 | :-: | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :---: | :--- |
-| **1** | **JFrog Artifactory** | • `build-and-deploy-snapshot.yml`<br>• `release-train-build.yml`<br>• `release-train-test.yml`<br>• `publicize-milestone.yml`<br>• `publicize-release.yml`<br>• `verify.yml` | **Enterprise Maven Repository Manager**: Manages staging, snapshot, and GA artifact repositories (`repo.spring.io`). Handles artifact promotion between milestone and release repositories, checksum verification, and Gradle dependency publishing. | JFrog Ltd. | Commercial / Proprietary EULA | Monthly or Annual SaaS, or Self-Hosted per-server license | **Cloud Pro:** ~$98 – $150 / mo (~$1,200/yr)<br>**Enterprise X:** ~$500 – $3,000+ / mo | **Conditional** *(Only if using Artifactory for distribution)* | **GitHub Packages (Maven)** *(Free for public repos)*<br>**Sonatype Nexus OSS** *(100% Free Self-Hosted)*<br>**GitHub Releases** *(ZIP downloads)* |
-| **2** | **Gradle Enterprise / Develocity** | • `ci.yml`<br>• `build-pull-request.yml`<br>• `run-system-tests.yml`<br>• `build-and-deploy-snapshot.yml`<br>• `release-train-build.yml`<br>• `release-train-test.yml` | **Build Acceleration & Telemetry Platform**: Provides remote build caching, distributed test execution, flaky test detection, and detailed build scan profiling (`ge.spring.io`) to optimize Gradle execution times. | Gradle Inc. | Commercial Enterprise License (Proprietary) | Annual subscription based on active developer committers or build agents | **Public:** Free (`scans.gradle.com`)<br>**Enterprise:** ~$200 – $400 / committer / year *(Typical enterprise floor: $25,000 – $50,000/yr)* | **No** *(Enhancement only; standard builds succeed without it)* | **GitHub Actions Job Summary** *(Built-in)*<br>**Public Gradle Build Scans** (`scans.gradle.com`)<br>**Native `actions/cache`** |
-| **3** | **GitHub Advanced Security (GHAS) / CodeQL** | • `run-codeql-analysis.yml` | **Static Application Security Testing (SAST)**: Performs semantic AST code scanning to discover security vulnerabilities, injection vectors, and CWE weaknesses in Java 25 code before binaries are published. | GitHub (Microsoft) | Commercial Enterprise Add-on | Per active committer per month (billed annually) | **Public Repos:** **$0 (100% Free)**<br>**Private Repos:** ~$49 / active committer / month (~$588/committer/yr) + GH Enterprise ($21/mo) | **No for Public** *(Only if private repo)* | **GitHub CodeQL on Public Repos** *(Free)*<br>**Semgrep OSS** *(100% Free)*<br>**SpotBugs + Find Security Bugs**<br>**SonarQube Community Edition** |
-| **4** | **High-Spec GitHub Compute Runners** (`UBUNTU_MEDIUM`, `UBUNTU_LARGE`, Windows) | • `release-train-test.yml` *(8-core)*<br>• `release-train-build.yml` *(4-core)*<br>• `ci.yml` *(Windows & Linux)*<br>• `run-system-tests.yml` *(Docker)* | **High-Memory / Multi-Core VM Compute**: Prevents out-of-memory (OOM) failures and execution timeouts during heavy Gradle compilation, multi-OS matrix testing, and concurrent Testcontainers execution. | GitHub / Microsoft Azure | Commercial Cloud Compute | Metered pay-as-you-go per runner minute or monthly dedicated VM pool | **4-core (`UBUNTU_MEDIUM`):** $0.016 / min (~$1.00/hr)<br>**8-core (`UBUNTU_LARGE`):** $0.032 / min (~$1.92/hr)<br>**Monthly Est:** ~$300 – $1,200 / mo | **No** *(Standard 2-vCPU runners succeed with tuning)* | **Standard GitHub-hosted runners** (`ubuntu-latest`)<br>**Self-Hosted Runners** on existing internal Kubernetes / bare-metal hardware |
-| **5** | **Google Workspace (Google Chat Webhook API)** | • `ci.yml`<br>• `build-and-deploy-snapshot.yml`<br>• `run-system-tests.yml`<br>• `verify.yml` | **CI/CD Team Notification Webhooks**: Sends automated real-time build health, regression notifications, and pipeline failure alerts to release engineering chat spaces. | Google LLC | Commercial SaaS EULA | Per user per month (annual or flexible) | **Business Starter:** $6 / user / mo<br>**Business Standard:** $12 / user / mo | **No** *(Optional)* | **Slack Incoming Webhooks** *(Free tier)*<br>**Discord Webhooks** *(100% Free)*<br>**GitHub Commit Status / Check Runs**<br>**Email Notifications** |
-| **6** | **Broadcom Tanzu Spring Enterprise Subscription** | • `build-and-deploy-snapshot.yml`<br>• `ci.yml`<br>• `release-train-build.yml`<br>• `publicize-release.yml` | **Commercial Distribution & Extended Support**: Activates commercial VMware/Broadcom branding, proprietary release repositories, and commercial patch feeds via repository variable `COMMERCIAL=true`. | Broadcom Inc. (VMware) | Proprietary Commercial EULA | Per production CPU core or annual enterprise license agreement | Bundled in VMware Tanzu Platform ($200 – $500+ / core / year; enterprise contracts $50,000 – $200,000+/yr) | **No** *(Fork uses Open Source Spring Boot)* | **Apache 2.0 Open Source Spring Boot** (`COMMERCIAL=false`) *(100% Free)* |
-| **7** | **Docker Hub Team / Business Tier** | • `run-system-tests.yml` | **Container Registry Bandwidth & Rate Limit Bypass**: Prevents anonymous rate-limit throttling (100 pulls/6hr) during system tests that pull 11+ container images (PostgreSQL, MySQL, Oracle, MongoDB, Kafka, etc.). | Docker Inc. | Commercial SaaS Subscription | Per user per month (annual or monthly) | **Free Tier:** 200 pulls/6hr (authenticated)<br>**Team:** $9 / user / mo<br>**Business:** $24 / user / mo | **No** *(Authenticated free account suffices)* | **GitHub Container Registry (`ghcr.io`)** *(Free)*<br>**Amazon ECR Public Gallery**<br>**Local Image Caching on Runners** |
-| **8** | **Commercial Code Signing Certificates (EV / Cloud HSM)** | • `publicize-release.yml`<br>• `build-and-deploy-snapshot.yml` | **Cryptographic Software Provenance**: Signs Java JARs, POMs, and CLI native executables to prevent OS security warnings (SmartScreen) and meet Maven Central publication rules. | DigiCert / Sectigo / AWS / GCP / Azure | Commercial PKI / Cloud KMS License | Annual certificate fee or cloud KMS consumption per key/operation | **GPG / PGP:** **$0 (100% Free)**<br>**Cloud KMS:** ~$1 – $10 / mo<br>**EV Code Signing Cert:** ~$400 – $700 / year | **Optional** *(PGP is free; EV only for CLI binaries)* | **Standard OpenPGP / GPG Keypair** *(100% Free, accepted by Maven Central)*<br>**Sigstore / Cosign** *(Free keyless signing)* |
-| **9** | **Broadcom Release Verification Test (RVT) Suite** | • `verify.yml`<br>• `build-and-deploy-snapshot.yml` | **Proprietary Ecosystem Verification Test Suite**: Clones and executes external release verification tests against staging repositories from `spring-projects/spring-boot-release-verification`. | Broadcom Inc. | Proprietary Internal / Partner License | Bundled with Broadcom enterprise partnerships (not sold standalone) | Proprietary contract agreement | **No** *(Replaced by built-in smoke tests)* | **Spring Boot Simple Smoke Tests** (`:smoke-test:spring-boot-smoke-test-simple:test`) *(Built-in)*<br>**Internal Enterprise Test Suite** |
-| **10** | **Gradle Plugin Portal Publisher** | • `publicize-milestone.yml`<br>• `publicize-release.yml` | **Public Plugin Distribution**: Publishes the `org.springframework.boot` Gradle build plugin to the global Gradle Plugin Portal (`plugins.gradle.org`). | Gradle Inc. | Terms of Service (Free OSS with commercial hosting options) | Free for public plugins; commercial hosting via Artifactory/Nexus | **Public:** **$0 (Free)**<br>**Internal:** Covered under Artifactory/Nexus license | **No** *(Unless publishing to public portal)* | **Internal Maven / Gradle Repo** *(GitHub Packages or Nexus OSS)* |
+| **1** | **JFrog Artifactory** | • `build-and-deploy-snapshot.yml`<br>• `release-train-build.yml`<br>• `release-train-test.yml`<br>• `publicize-milestone.yml`<br>• `publicize-release.yml`<br>• `verify.yml` | **Enterprise Maven Repository Manager**: Manages staging, snapshot, and GA repositories (`repo.spring.io`). Handles artifact promotion between milestone and release stages, checksum validation, and Gradle dependency publishing. | JFrog Ltd. | Commercial / Proprietary EULA | Monthly or Annual SaaS, or Self-Hosted per-server license | **Cloud Pro:** ~$98 – $150 / mo (~$1,200/yr)<br>**Enterprise X:** ~$500 – $3,000+ / mo | **Conditional** *(Only if using Artifactory)* | **GitHub Packages (Maven)** *(Free for public repos)*<br>**Sonatype Nexus OSS** *(100% Free Self-Hosted)*<br>**GitHub Releases** *(ZIP downloads)* |
+| **2** | **Gradle Enterprise / Develocity** | • `ci.yml`<br>• `build-pull-request.yml`<br>• `run-system-tests.yml`<br>• `build-and-deploy-snapshot.yml`<br>• `release-train-build.yml`<br>• `release-train-test.yml` | **Build Acceleration & Telemetry**: Remote build caching, distributed test execution, flaky test detection, and detailed build scan profiling (`ge.spring.io`) to accelerate Gradle execution. | Gradle Inc. | Commercial Enterprise License (Proprietary) | Annual subscription based on active developer committers or build agents | **Public:** Free (`scans.gradle.com`)<br>**Enterprise:** ~$200 – $400 / committer / year *(Typical floor: $25k – $50k/yr)* | **No** *(Enhancement only; standard builds succeed)* | **GitHub Actions Job Summary** *(Built-in)*<br>**Public Gradle Build Scans** (`scans.gradle.com`)<br>**Native `actions/cache`** |
+| **3** | **GitHub Advanced Security (GHAS) / CodeQL** | • `run-codeql-analysis.yml` | **Static Application Security Testing (SAST)**: Semantic AST code analysis to detect security vulnerabilities, injection vectors, and CWE flaws in Java 25 code before binaries are published. | GitHub (Microsoft) | Commercial Enterprise Add-on | Per active committer per month (annual billing) | **Public Repos:** **$0 (100% Free)**<br>**Private Repos:** ~$49 / committer / month (~$588/committer/yr) + GH Enterprise ($21/mo) | **No for Public** *(Only if private repo)* | **GitHub CodeQL on Public Repos** *(Free)*<br>**Semgrep OSS** *(100% Free)*<br>**SpotBugs + Find Security Bugs**<br>**SonarQube Community Edition** |
+| **4** | **Google Workspace (Google Chat Webhook API)** | • `ci.yml`<br>• `build-and-deploy-snapshot.yml`<br>• `run-system-tests.yml`<br>• `verify.yml` | **CI/CD Team Notification Webhooks**: Sends automated real-time build health, regression notifications, and pipeline failure alerts to release engineering chat spaces. | Google LLC | Commercial SaaS EULA | Per user per month (annual or flexible) | **Business Starter:** $6 / user / mo<br>**Business Standard:** $12 / user / mo | **No** *(Optional)* | **Slack Incoming Webhooks** *(Free tier)*<br>**Discord Webhooks** *(100% Free)*<br>**GitHub Commit Status / Check Runs**<br>**Email Notifications** |
+| **5** | **Broadcom Tanzu Spring Enterprise Subscription** | • `build-and-deploy-snapshot.yml`<br>• `ci.yml`<br>• `release-train-build.yml`<br>• `publicize-release.yml` | **Commercial Distribution & Extended Support**: Activates commercial VMware/Broadcom branding, proprietary release repositories, and commercial patch feeds via repository variable `COMMERCIAL=true`. | Broadcom Inc. (VMware) | Proprietary Commercial EULA | Per production CPU core or annual enterprise license agreement | Bundled in VMware Tanzu Platform ($200 – $500+ / core / year; enterprise contracts $50k – $200k+/yr) | **No** *(Fork uses Open Source Spring Boot)* | **Apache 2.0 Open Source Spring Boot** (`COMMERCIAL=false`) *(100% Free)* |
+| **6** | **Docker Hub Team / Business Tier** | • `run-system-tests.yml` | **Container Registry Bandwidth & Rate Limit Bypass**: Prevents anonymous rate-limit throttling (100 pulls/6hr) during system tests that pull 11+ container images (PostgreSQL, MySQL, Oracle, MongoDB, Kafka, etc.). | Docker Inc. | Commercial SaaS Subscription | Per user per month (annual or monthly) | **Free Tier:** 200 pulls/6hr (authenticated)<br>**Team:** $9 / user / mo<br>**Business:** $24 / user / mo | **No** *(Authenticated free account suffices)* | **GitHub Container Registry (`ghcr.io`)** *(Free)*<br>**Amazon ECR Public Gallery**<br>**Local Image Caching on Runners** |
+| **7** | **Commercial Code Signing Certificates (EV / Cloud HSM)** | • `publicize-release.yml`<br>• `build-and-deploy-snapshot.yml` | **Cryptographic Software Provenance**: Signs Java JARs, POMs, and CLI native executables to prevent OS security warnings (SmartScreen) and meet Maven Central publication rules. | DigiCert / Sectigo / AWS / GCP / Azure | Commercial PKI / Cloud KMS License | Annual certificate fee or cloud KMS consumption per key/operation | **GPG / PGP:** **$0 (100% Free)**<br>**Cloud KMS:** ~$1 – $10 / mo<br>**EV Code Signing Cert:** ~$400 – $700 / year | **Optional** *(PGP is free; EV only for CLI binaries)* | **Standard OpenPGP / GPG Keypair** *(100% Free, accepted by Maven Central)*<br>**Sigstore / Cosign** *(Free keyless signing)* |
+| **8** | **Broadcom Release Verification Test (RVT) Suite** | • `verify.yml`<br>• `build-and-deploy-snapshot.yml` | **Proprietary Ecosystem Verification Test Suite**: Clones and executes external release verification tests against staging repositories from `spring-projects/spring-boot-release-verification`. | Broadcom Inc. | Proprietary Internal / Partner License | Bundled with Broadcom enterprise partnerships (not sold standalone) | Proprietary contract agreement | **No** *(Replaced by built-in smoke tests)* | **Spring Boot Simple Smoke Tests** (`:smoke-test:spring-boot-smoke-test-simple:test`) *(Built-in)*<br>**Internal Enterprise Test Suite** |
+| **9** | **Gradle Plugin Portal Publisher** | • `publicize-milestone.yml`<br>• `publicize-release.yml` | **Public Plugin Distribution**: Publishes the `org.springframework.boot` Gradle build plugin to the global Gradle Plugin Portal (`plugins.gradle.org`). | Gradle Inc. | Terms of Service (Free OSS with commercial hosting options) | Free for public plugins; commercial hosting via Artifactory/Nexus | **Public:** **$0 (Free)**<br>**Internal:** Covered under Artifactory/Nexus license | **No** *(Unless publishing to public portal)* | **Internal Maven / Gradle Repo** *(GitHub Packages or Nexus OSS)* |
 
 ---
 
-## 3. Deep-Dive: Tool Profiles & Use Cases
+## 4. Deep-Dive: Infrastructure Architecture & Setup Requirements
 
-### 3.1 JFrog Artifactory
-* **Role in Pipelines**:
-  * In `build-and-deploy-snapshot.yml`: Publishes snapshot artifacts to `repo.spring.io/snapshot`.
-  * In `release-train-build.yml` and `release-train-test.yml`: Deploys staging artifacts to temporary train repositories and resolves upstream dependencies.
-  * In `publicize-milestone.yml` and `publicize-release.yml`: Promotes validated staging artifacts to public milestone and release repositories.
-* **Cost Impact**:
-  * Cloud Pro starts at **$98/month** (annual commitment).
-  * Self-hosted enterprise licenses start around **$3,000–$5,000/year**.
-* **Fork Recommendation**:
-  * If your enterprise already maintains Artifactory or Sonatype Nexus, supply `ARTIFACTORY_USERNAME`, `ARTIFACTORY_PASSWORD`, and `ARTIFACTORY_DEPLOY_REPO_URL`.
-  * If not, leave secrets empty; the pipeline automatically uses **GitHub Packages** and **GitHub Releases** at **$0 cost**.
-
----
-
-### 3.2 Gradle Enterprise / Develocity
-* **Role in Pipelines**:
-  * In `ci.yml`, `build-pull-request.yml`, and `run-system-tests.yml`: Injects `-Ddevelocity.storage.directory` and `--scan` to store execution graphs and cache compile outputs across runs.
-* **Cost Impact**:
-  * Priced per active committer, typically requiring an enterprise minimum contract of **$25,000–$50,000/year**.
-* **Fork Recommendation**:
-  * **Do not purchase for the fork alone**.
-  * The pipeline handles the absence of `DEVELOCITY_ACCESS_KEY` cleanly without failing the build.
-  * Standard GitHub Actions cache (`gradle/actions/setup-gradle`) provides sufficient caching for CI execution.
+### 4.1 Compute Runner Tiering & Sizing Architecture
+* **Upstream Configuration**: Upstream assigns jobs using repository variables:
+  * `runs-on: ${{ vars.UBUNTU_MEDIUM }}` (4-core, 16GB RAM)
+  * `runs-on: ${{ vars.UBUNTU_LARGE }}` (8-core, 32GB RAM)
+  * `runs-on: windows-latest`
+* **Why Upstream Needed Larger Compute**:
+  * Spring Boot compiles over 150 submodules with full annotation processors, generating extensive bytecode and Javadoc bundles.
+  * System tests (`run-system-tests.yml`) spin up 11+ heavy database containers in parallel using Testcontainers, requiring at least 8GB of free RAM to prevent the Linux kernel OOM killer (`kill -9`) from terminating Gradle test workers.
+* **Fork Adaptation**:
+  * All workflows in our fork implement dynamic fallback resolution: `${{ vars.UBUNTU_MEDIUM || 'ubuntu-latest' }}`.
+  * Workflows run cleanly on standard included GitHub runners by tuning Gradle JVM heap settings (`-Xmx3g`) and sequentializing container execution.
 
 ---
 
-### 3.3 GitHub Advanced Security (GHAS) & CodeQL
-* **Role in Pipelines**:
-  * In `run-codeql-analysis.yml`: Analyzes Java source code for CWE flaws, SQL injection, insecure deserialization, and path traversal vulnerabilities.
-* **Cost Impact**:
-  * Public repositories: **$0 (Free)**.
-  * Private repositories: **$49 per active committer/month** billed annually.
-* **Fork Recommendation**:
-  * If the fork is hosted as a **public GitHub repository**, CodeQL runs at zero cost.
-  * If the fork is in a **private enterprise organization**, either enable GHAS or replace with **Semgrep OSS** or **SonarQube Community Edition**.
+### 4.2 External Artifact Repository Setup (JFrog Artifactory vs. Alternatives)
+* **Required External Setup**:
+  * An enterprise JFrog Artifactory instance with three dedicated Maven repositories:
+    1. Snapshot target: `libs-snapshot-local`
+    2. Milestone staging target: `libs-milestone-local`
+    3. Production GA release target: `libs-release-local`
+  * Networking: Outbound HTTPS (Port 443) access from GitHub runner IP ranges to the Artifactory domain.
+  * Secrets: `ARTIFACTORY_USERNAME`, `ARTIFACTORY_PASSWORD`, `ARTIFACTORY_DEPLOY_REPO_URL`.
+* **Zero-Cost Fork Alternative**:
+  * Our fork automatically checks if `secrets.ARTIFACTORY_USERNAME` is populated.
+  * If omitted, it packages all build outputs into `spring-boot-<version>-snapshot.zip` and deploys directly to **GitHub Releases** and **GitHub Packages**, requiring **zero external cloud infrastructure**.
 
 ---
 
-### 3.4 High-Spec Compute Runners (`UBUNTU_MEDIUM`, `UBUNTU_LARGE`, Windows)
-* **Role in Pipelines**:
-  * `release-train-test.yml` requires 8 vCPUs (`UBUNTU_LARGE`) for full test suites.
-  * `run-system-tests.yml` launches 11+ Docker database containers simultaneously.
-  * `ci.yml` runs a Windows runner matrix.
-* **Cost Impact**:
-  * Standard 2-core Linux runners are included in GitHub plan quotas.
-  * 4-core runners cost **$0.016/min** (~$0.96/hr); 8-core runners cost **$0.032/min** (~$1.92/hr).
-  * Windows runners cost **$0.016/min** (2-core) or **$0.032/min** (4-core).
-* **Fork Recommendation**:
-  * Use the built-in fallback: `vars.UBUNTU_MEDIUM || 'ubuntu-latest'`.
-  * Standard runners complete the build successfully; if build duration needs to be reduced from 15 minutes to 7 minutes, configure self-hosted runners on existing internal Kubernetes clusters.
+### 4.3 Container Infrastructure & Registry Networking
+* **Required External Setup**:
+  * Docker Engine 24.0+ running on the host runner with `/var/run/docker.sock` mounted.
+  * Docker Hub credentials (`DOCKERHUB_USERNAME`, `DOCKERHUB_PASSWORD`) configured to prevent hitting Docker Hub's anonymous rate limit of 100 pulls per 6 hours.
+* **Storage Footprint**:
+  * Pre-pulling container images for PostgreSQL, MySQL, MariaDB, Oracle-Free, MS SQL, Neo4j, Cassandra, MongoDB, Redis, RabbitMQ, and Kafka consumes approximately **18 GB to 25 GB of disk space**.
+  * On GitHub-hosted runners, a pre-flight disk cleanup step removes unused Android SDKs and .NET runtimes to free up 30GB+ of runner disk space.
 
 ---
 
-### 3.5 Broadcom Release Verification Test (RVT) Suite
-* **Role in Pipelines**:
-  * `verify.yml` attempts to clone `spring-projects/spring-boot-release-verification` to execute external smoke tests.
-* **Cost Impact**:
-  * Proprietary Broadcom intellectual property; not commercially available as a standalone product.
-* **Fork Recommendation**:
-  * In our fork, `verify.yml` automatically detects that the private repository is inaccessible (HTTP 404) and runs the built-in Spring Boot Simple Smoke Test (`:smoke-test:spring-boot-smoke-test-simple:test`) on JDK 25.
-  * Provides complete container startup and health check verification at **$0 cost**.
+### 4.4 Cryptographic Key Management & Release Signing
+* **Required External Setup**:
+  * An ASCII-armored OpenPGP private key registered with public keyservers (`keys.openpgp.org`, `pgp.mit.edu`).
+  * For enterprise compliance, keys can be stored inside **Cloud KMS / CloudHSM** (AWS KMS, Azure Key Vault, Google Cloud KMS) where signing operations are performed via REST API without exposing raw private keys.
+* **Secrets Configuration**:
+  * `GPG_PRIVATE_KEY`: Raw ASCII-armored private key string.
+  * `GPG_PASSPHRASE`: Password decrypting the private key during Gradle `sign` tasks.
 
 ---
 
-## 4. Total Cost of Ownership (TCO) Architectural Comparison
+## 5. Total Cost of Ownership (TCO) Architectural Comparison
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ Architecture Model A: Full Commercial Upstream Stack                        │
-│ • JFrog Artifactory Cloud Pro:                  $1,200 / year               │
-│ • Gradle Develocity Enterprise:                $25,000 / year               │
-│ • GitHub Advanced Security (10 committers):     $5,880 / year               │
-│ • High-Spec GitHub Runners (4-core/8-core):       $900 / year               │
-│ • EV Code Signing Certificate:                    $500 / year               │
-│ • Google Workspace (Alerts):                       $72 / year               │
-│ TOTAL ESTIMATED ANNUAL COST:                  ~$33,552 / year               │
+│ • JFrog Artifactory Enterprise SaaS:           $1,200 – $3,600 / year       │
+│ • Gradle Develocity Enterprise:               $25,000 – $50,000 / year      │
+│ • GitHub Advanced Security (10 committers):             $5,880 / year       │
+│ • High-Spec GitHub Runners (4-core/8-core):               $900 / year       │
+│ • EV Code Signing Certificate:                            $500 / year       │
+│ • Google Workspace (Alerts):                               $72 / year       │
+│ TOTAL ESTIMATED ANNUAL COST:                  ~$33,552 – $60,952 / year     │
 └──────────────────────────────────────┬──────────────────────────────────────┘
                                        │
 ┌──────────────────────────────────────▼──────────────────────────────────────┐
@@ -132,18 +136,19 @@ While upstream Spring Boot (managed by Broadcom / VMware Tanzu) integrates deepl
 
 ---
 
-## 5. Enterprise Procurement & Setup Checklist
+## 6. Enterprise Procurement & Infrastructure Setup Checklist
 
-Before triggering production enterprise releases, review which capabilities your organization requires:
+Before triggering production enterprise releases, review which infrastructure capabilities your organization requires:
 
-1. **Artifact Hosting**:
-   - [ ] *Option 1*: Populate `ARTIFACTORY_USERNAME` and `ARTIFACTORY_PASSWORD` to deploy to corporate Artifactory/Nexus.
-   - [ ] *Option 2*: Use active native mode (publishes ZIP release bundles to GitHub Releases and JARs to GitHub Packages).
-2. **Artifact Signing**:
-   - [ ] Generate an ASCII-armored GPG keypair (`gpg --armor --export-secret-keys <ID>`) and set `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE`.
-3. **Security Compliance**:
-   - [ ] Ensure `run-codeql-analysis.yml` reports 0 high/critical vulnerabilities on `main`.
-4. **Build Observability**:
-   - [ ] Use GitHub Actions Job Summaries or add `DEVELOCITY_ACCESS_KEY` if your company subscribes to Gradle Develocity.
-5. **Compute Quotas**:
-   - [ ] Verify GitHub Actions spending limits permit Windows matrix builds and Docker system tests.
+1. **Compute & Runner Infrastructure**:
+   - [ ] *Option 1 (Zero Cost)*: Use standard GitHub-hosted `ubuntu-latest` and `windows-latest` runners (Active Default).
+   - [ ] *Option 2 (Performance)*: Configure `vars.UBUNTU_MEDIUM` and `vars.UBUNTU_LARGE` with custom 4-core/8-core labels or deploy an on-premises Kubernetes runner cluster via Actions Runner Controller (ARC).
+2. **Artifact Repository Infrastructure**:
+   - [ ] *Option 1 (Enterprise)*: Populate `ARTIFACTORY_USERNAME`, `ARTIFACTORY_PASSWORD`, and `ARTIFACTORY_DEPLOY_REPO_URL` to route deployments to corporate Artifactory/Nexus.
+   - [ ] *Option 2 (GitHub Native)*: Leave Artifactory secrets empty to automatically publish release ZIP bundles to GitHub Releases and JARs to GitHub Packages.
+3. **Container Infrastructure**:
+   - [ ] Ensure Docker daemon is running on runners and optionally populate `DOCKERHUB_USERNAME`/`PASSWORD` to avoid anonymous IP rate limits.
+4. **Cryptographic Release Signing**:
+   - [ ] Generate an OpenPGP keypair (`gpg --armor --export-secret-keys <ID>`) and configure `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` in GitHub Secrets.
+5. **Team Collaboration Gateways**:
+   - [ ] Populate `GOOGLE_CHAT_WEBHOOK_URL` (or configure a Slack/Discord incoming webhook) for real-time build and release status cards.
