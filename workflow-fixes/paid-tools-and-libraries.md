@@ -253,40 +253,73 @@ To execute open-source builds and releases from your public fork repository, com
 
 ---
 
-## 9. Technology Stack & Infrastructure Infographic
+## 9. Technology Stack & Infrastructure (Original Upstream Before Changes)
 
-The infographic below summarizes the core Infrastructure, GitHub Native Tools, and Third-Party (3P) Tools/Libraries powering Spring Boot's build, test, security, and distribution lifecycle:
+> [!NOTE]
+> This section catalogs the **exact Infrastructure, GitHub-Native Tools, and Third-Party (3P) Tools** used in upstream Spring Boot **BEFORE any code changes or fork customizations**. All entries are verified against the upstream base commit (`2904c4c0c49`).
 
-![Spring Boot Stack Infographic](spring-boot-tools-and-infra.png)
+![Spring Boot Pre-Change Stack Infographic](spring-boot-pre-change-tools-and-infra.png)
+
+### 1. INFRA (Infrastructure Before Changes)
+
+| Infra | Purpose | Evidence in Upstream Workflow (Before Changes) |
+| :--- | :--- | :--- |
+| **Paid Larger Runners (`ubuntu22-2-8` & `ubuntu22-4-16`)** | **High-Memory Mid/Heavy Compute for Parallel Multi-Module Compilation** | Hardcoded runner labels in `release-train-build.yml:28` (`runs-on: "ubuntu22-2-8"`) and `release-train-test.yml:28` (`runs-on: "ubuntu22-4-16"`). |
+| **JFrog Artifactory SaaS (`repo.spring.io`)** | **Central Enterprise Maven Repository for Staging & Artifact Promotion** | Upstream published snapshots to `libs-snapshot-local` and releases to `repo.spring.io/release` via `spring-io/artifactory-deploy-action@v0.0.6` in `build-and-deploy-snapshot.yml:31` and `publicize-release.yml:41`. |
+| **Gradle Enterprise / Develocity (`ge.spring.io`)** | **Remote Distributed Build Cache & Performance Telemetry Cluster** | Injected across build jobs in `ci.yml:54` (`develocity-access-key: ${{ secrets.DEVELOCITY_ACCESS_KEY }}`) and `release-train-build.yml:54` (`GRADLE_ENTERPRISE_ACCESS_KEY`). |
+| **Docker Engine & Testcontainers Runtime Host** | **Host for 11+ Real Database & Broker Containers in System Tests** | Runs 11+ real database and messaging containers (PostgreSQL, MariaDB, MS SQL, Neo4j, Redis, Kafka) concurrently in `run-system-tests.yml`. |
+| **Developer Workstation / VM (JDK 25 / 21 / 17)** | **Local Development, Incremental Compilation & Interactive Debugging** | Local developer environments executing `./gradlew build` and `./gradlew test` with OpenJDK 25 toolchains. |
+
+---
+
+### 2. GITHUB TOOLS (GitHub Native Tools Before Changes)
+
+| Tool | Purpose | Evidence in Upstream Workflow (Before Changes) |
+| :--- | :--- | :--- |
+| **Public GitHub Repository (`spring-projects/spring-boot`)** | **Source Control & Community Issue Tracking** | Canonical upstream repository hosting source code, pull requests, issue tracker, and discussions. |
+| **GitHub Actions** | **CI/CD Workflow Automation (15 Pipelines)** | Execution engine running 15 YAML pipelines in `.github/workflows/*.yml`. |
+| **`actions/checkout`** | **Repository & Submodule Checkout** | Used across all 15 workflows, plus checking out private test suite `spring-projects/spring-boot-release-verification` in `verify.yml:41-44`. |
+| **`actions/setup-java`** | **Java OpenJDK 25 Toolchain Provisioning** | `uses: actions/setup-java` downloading Liberica and Temurin JDK 25 in `ci.yml`, `verify.yml`, and `prepare-gradle-build`. |
+| **CodeQL (`spring-io/github-actions`)** | **Security Scanning (SAST Vulnerabilities)** | `uses: spring-io/github-actions/.github/workflows/codeql-analysis.yml@5caba18f...` in `run-codeql-analysis.yml:13`. |
+| **GitHub Secrets** | **Proprietary Credentials Management** | `secrets.DEVELOCITY_ACCESS_KEY`, `secrets.ARTIFACTORY_USERNAME`, `secrets.ARTIFACTORY_PASSWORD`, `secrets.JF_ARTIFACTORY_SPRING`, `secrets.GOOGLE_CHAT_WEBHOOK_URL`, `secrets.RELEASE_TRAIN_PARTICIPANT_GITHUB_TOKEN`. |
+| **GitHub Releases** | **GA & Milestone Release Management** | Created and populated during GA and Milestone publicization in `publicize-release.yml` and `publicize-milestone.yml`. |
+| **`actions/upload-artifact` & `download-artifact`** | **Inter-Job Build Artifact Storage** | `uses: actions/upload-artifact` and `uses: actions/download-artifact` transferring built artifacts between decoupled stages. |
+| **GitHub Milestones** | **Changelog Issue & PR Aggregation** | Tracked by `spring-io/github-changelog-generator` to aggregate closed issues into categorized release notes. |
+
+---
+
+### 3. 3P TOOLS (Third-Party Tools & Libraries Before Changes)
+
+| Tool | Purpose | Evidence in Upstream Workflow (Before Changes) |
+| :--- | :--- | :--- |
+| **JFrog Artifactory (`repo.spring.io`)** | **Enterprise Maven Repository (Snapshots/GA)** | Staging, promotion, and GA artifact hosting in `build-and-deploy-snapshot.yml`, `release-train-build.yml`, `publicize-release.yml`. |
+| **Gradle Enterprise / Develocity (`ge.spring.io`)** | **Remote Build Caching & Build Scans** | Upstream build telemetry, remote task caching, and test profiling cluster configured in `.github/actions/prepare-gradle-build`. |
+| **Broadcom RVT Suite (`spring-boot-release-verification`)** | **Downstream Consumer Release Verification** | Private repository `spring-projects/spring-boot-release-verification` cloned in `verify.yml:41-44` to test staged artifacts. |
+| **Tanzu Commercial Gating (`COMMERCIAL=true`)** | **Commercial Feeds & VMware Tanzu Branding** | Upstream variable gate (`COMMERCIAL=true`) toggling commercial distribution and patch feeds in `build-and-deploy-snapshot.yml:14`. |
+| **Release Train Orchestrator (`spring-io/release-train`)** | **Coordinated Portfolio Release State Machine** | Central orchestrator receiving API dispatches and callbacks in `release-train-build.yml:76` and `release-train-join/leave/ready/retry.yml`. |
+| **External Docs Site (`spring-projects/spring-boot-docs`)** | **Decoupled Antora Reference Documentation** | External site rebuild dispatched via `gh workflow run deploy-docs.yml -r docs-build` in `trigger-docs-build.yml:23`. |
+| **JFrog CLI (`jfrog/setup-jfrog-cli`)** | **Artifactory Staging & Plugin Promotion** | CLI tool in `.github/actions/publish-gradle-plugin:16` downloading and staging plugins from Artifactory. |
+| **Google Workspace (Google Chat Webhook API)** | **CI/CD Team Notification Webhooks** | Automated alerting to release engineering chat spaces via `webhook-url: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}` in `ci.yml:67`. |
+| **Broadcom Homebrew Tap (`spring-io/homebrew-tap`)** | **Official CLI Homebrew Formula Distribution** | Cloned and updated during release publicization in `publicize-release.yml:41`. |
+| **Gradle Build Tool & Wrapper** | **Build Automation & Dependency Resolution** | Enterprise build automation engine running all compilation, test execution, and packaging tasks. |
+| **JUnit 5, AssertJ & Mockito** | **Unit & Integration Testing Frameworks** | Core testing framework, fluent assertion library, and mocking doubles executed across all test suites. |
+| **Testcontainers & Docker** | **Real Multi-Service Containerized Testing** | Ephemeral containerized databases and messaging brokers running concurrently in `run-system-tests.yml`. |
+| **Paketo Buildpacks (`bootBuildImage`)** | **Cloud Native OCI Container Image Generation** | Built-in Cloud Native Buildpack plugin creating standard OCI container images without Dockerfiles. |
+| **Antora & Asciidoctor** | **Technical Documentation Site Generator** | Compiles multi-version Spring Boot reference manuals, user guides, and API documentation. |
+| **Gradle Plugin Portal (`plugins.gradle.org`)** | **Public Plugin Distribution** | Global repository where the `org.springframework.boot` Gradle build plugin is published. |
+| **Checkstyle & Spring Java Format** | **Code Quality Enforcement & Java Linting** | Enforces Spring Framework formatting standards and coding style conventions. |
+| **BellSoft Liberica & Eclipse Temurin JDK** | **Java Development Kit (JDK 25 Toolchain)** | Upstream OpenJDK 25 runtime environments provisioning `JAVA_HOME` across runners. |
+
+---
+
+## 10. Technology Stack & Infrastructure (Post-Change Open-Source Model)
+
+The infographic below summarizes the zero-cost Open-Source Software (OSS) replacement model implemented in this repository under GitHub Enterprise:
+
+![Spring Boot Post-Change Stack Infographic](spring-boot-tools-and-infra.png)
 
 ### Summary Breakdown
+* **INFRA**: GitHub-Hosted Standard Runners (`ubuntu-latest`, `windows-latest`) + Local Developer Workstation + Docker CE / Testcontainers Daemon.
+* **GITHUB TOOLS**: Public GitHub Repository + GitHub Actions + GitHub Packages (Maven) + Dependabot + CodeQL SAST + GitHub Secrets + GitHub Releases + GitHub Pages / Antora.
+* **3P TOOLS**: Gradle + JUnit 5 + AssertJ + Mockito + Testcontainers + Docker + Paketo Buildpacks + Antora & Asciidoctor + Maven Central (Sonatype) + Gradle Plugin Portal + Homebrew (`<org>/homebrew-tap`) + Checkstyle / Spring Format + BellSoft / Temurin JDK.
 
-#### 1. INFRA
-* **GitHub-Hosted Runners (Ubuntu & Windows)**: Multi-OS Matrix CI/CD Build & Parallel Test Execution.
-* **Developer Workstation / VM (JDK 17/21/25)**: Local Development, Compilation & Debugging.
-* **Docker Engine & Testcontainers Daemon**: Disposable Multi-Service Ephemeral Testing Environments.
-
-#### 2. GITHUB TOOLS
-* **Public GitHub Repository**: Source Control & Collaboration.
-* **GitHub Actions**: CI/CD & Automated Pipelines.
-* **GitHub Packages (Maven)**: Package & Snapshot Registry.
-* **Dependabot**: Dependency Management (vulnerabilities).
-* **CodeQL**: Security Scanning (vulnerabilities).
-* **GitHub Secrets**: Secrets Management.
-* **GitHub Releases**: Release Management.
-* **GitHub Pages / Antora**: Documentation Hosting.
-
-#### 3. 3P TOOLS
-* **Gradle**: Build Automation & Dependencies.
-* **JUnit 5 (Jupiter)**: Unit & Integration Testing.
-* **AssertJ**: Fluent Test Assertions.
-* **Mockito**: Mocking & Test Doubles.
-* **Testcontainers**: E2E Real Database & Broker Testing.
-* **Docker**: Build Platform & Container Testing.
-* **Paketo Buildpacks**: Cloud-Native OCI Image Generation.
-* **Antora & Asciidoctor**: Documentation Site Generation.
-* **Maven Central (Sonatype)**: Global Artifact Distribution.
-* **Gradle Plugin Portal**: Plugin Publishing & Distribution.
-* **Homebrew**: CLI Package Distribution (macOS/Linux).
-* **Checkstyle / Spring Format**: Code Quality & Linting.
-* **BellSoft Liberica / Temurin**: JDK Toolchains & Runtimes (17, 21, 25).
