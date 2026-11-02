@@ -249,3 +249,44 @@ To execute open-source builds and releases from your public fork repository, com
 1. Run `build-pull-request.yml` or `ci.yml` to verify full compilation and test suite passes on both Linux and Windows runners.
 2. Trigger `release-train-build.yml` with `callback: none` and version (e.g., `3.5.0-OSS`).
 3. Trigger `publicize-release.yml` to sign artifacts, publish packages, and generate the official GitHub Release with release notes!
+
+
+---
+
+## 9. Technology Stack & Infrastructure Infographic
+
+The infographic below summarizes the core Infrastructure, GitHub Native Tools, and Third-Party (3P) Tools/Libraries powering Spring Boot's build, test, security, and distribution lifecycle:
+
+![Spring Boot Stack Infographic](spring-boot-tools-and-infra.png)
+
+### Summary Breakdown
+
+#### 1. INFRA
+* **GitHub-Hosted Runners (Ubuntu & Windows)**: Multi-OS Matrix CI/CD Build & Parallel Test Execution.
+* **Developer Workstation / VM (JDK 17/21/25)**: Local Development, Compilation & Debugging.
+* **Docker Engine & Testcontainers Daemon**: Disposable Multi-Service Ephemeral Testing Environments.
+
+#### 2. GITHUB TOOLS
+* **Public GitHub Repository**: Source Control & Collaboration.
+* **GitHub Actions**: CI/CD & Automated Pipelines.
+* **GitHub Packages (Maven)**: Package & Snapshot Registry.
+* **Dependabot**: Dependency Management (vulnerabilities).
+* **CodeQL**: Security Scanning (vulnerabilities).
+* **GitHub Secrets**: Secrets Management.
+* **GitHub Releases**: Release Management.
+* **GitHub Pages / Antora**: Documentation Hosting.
+
+#### 3. 3P TOOLS
+* **Gradle**: Build Automation & Dependencies.
+* **JUnit 5 (Jupiter)**: Unit & Integration Testing.
+* **AssertJ**: Fluent Test Assertions.
+* **Mockito**: Mocking & Test Doubles.
+* **Testcontainers**: E2E Real Database & Broker Testing.
+* **Docker**: Build Platform & Container Testing.
+* **Paketo Buildpacks**: Cloud-Native OCI Image Generation.
+* **Antora & Asciidoctor**: Documentation Site Generation.
+* **Maven Central (Sonatype)**: Global Artifact Distribution.
+* **Gradle Plugin Portal**: Plugin Publishing & Distribution.
+* **Homebrew**: CLI Package Distribution (macOS/Linux).
+* **Checkstyle / Spring Format**: Code Quality & Linting.
+* **BellSoft Liberica / Temurin**: JDK Toolchains & Runtimes (17, 21, 25).
