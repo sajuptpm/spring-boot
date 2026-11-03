@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Spring Boot Architecture – Component Tiers</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    body {
+      background-color: #f4fbfb;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      min-height: 100vh;
+    }
+    .diagram-card {
+      background: #ffffff;
+      border: 3px solid #009688;
+      border-radius: 14px;
+      width: 1080px;
+      box-shadow: 0 12px 36px rgba(0, 150, 136, 0.12);
+      padding: 24px 28px 28px 28px;
+    }
+    .header-banner {
+      background-color: #00897B;
+      color: #ffffff;
+      font-size: 26px;
+      font-weight: 700;
+      text-align: center;
+      padding: 16px 20px;
+      border-radius: 8px;
+      letter-spacing: 0.5px;
+      margin-bottom: 30px;
+      box-shadow: 0 4px 12px rgba(0, 137, 123, 0.25);
+    }
+    .tiers-container {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+    .tier-row {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    /* Left Tier Pill */
+    .tier-label {
+      width: 250px;
+      min-width: 250px;
+      height: 76px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-size: 17px;
+      font-weight: 700;
+      color: #ffffff;
+      padding: 10px 18px;
+      line-height: 1.35;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+    }
+    .tier-1-label {
+      background-color: #00838F; /* Deep Cyan/Teal */
+    }
+    .tier-2-label {
+      background-color: #00796B; /* Dark Teal (Owned) */
+    }
+    .tier-3-label {
+      background-color: #00838F; /* Deep Cyan */
+    }
+    .tier-4-label {
+      background-color: #00838F; /* Deep Cyan */
+    }
+
+    /* Right Components Box */
+    .components-box {
+      flex: 1;
+      height: 76px;
+      border: 2px dashed #00ACC1;
+      border-radius: 14px;
+      background-color: #F7FEFE;
+      display: flex;
+      align-items: center;
+      justify-content: space-evenly;
+      padding: 0 16px;
+      gap: 12px;
+    }
+
+    /* Component Badge / Pill */
+    .comp-pill {
+      flex: 1;
+      height: 52px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #ffffff;
+      font-size: 14.5px;
+      font-weight: 600;
+      padding: 4px 10px;
+      line-height: 1.25;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+      transition: transform 0.2s;
+    }
+    .comp-pill.ellipsis {
+      flex: 0 0 36px;
+      background: none !important;
+      color: #00838F !important;
+      box-shadow: none !important;
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: 2px;
+    }
+
+    /* Type A: Owned (Dark Teal) */
+    .type-owned {
+      background-color: #00796B;
+    }
+
+    /* Type B: 3P Dependent (Cyan / Blue) */
+    .type-3p {
+      background-color: #0288D1;
+    }
+
+    /* Legend Section */
+    .legend-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 24px;
+      margin-top: 32px;
+      padding-top: 18px;
+      border-top: 1px dashed #B2DFDB;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .legend-pill {
+      min-width: 220px;
+      height: 48px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      font-weight: 700;
+      color: #ffffff;
+      padding: 0 18px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="diagram-card">
+    <!-- Header Banner -->
+    <div class="header-banner">
+      Spring Boot Architecture – Component Tiers
+    </div>
+
+    <!-- Tiers Container -->
+    <div class="tiers-container">
+      
+      <!-- Tier 1 -->
+      <div class="tier-row">
+        <div class="tier-label tier-1-label">
+          Tier-1: Core Platform<br>Components
+        </div>
+        <div class="components-box">
+          <div class="comp-pill type-3p">Spring Core<br>& Beans</div>
+          <div class="comp-pill type-3p">Spring<br>Context</div>
+          <div class="comp-pill type-3p">Spring AOP<br>& TX</div>
+          <div class="comp-pill type-3p">Spring Web<br>& MVC/Flux</div>
+          <div class="comp-pill ellipsis">...</div>
+          <div class="comp-pill type-3p">JVM / OpenJDK<br>(Java 17-25)</div>
+        </div>
+      </div>
+
+      <!-- Tier 2 -->
+      <div class="tier-row">
+        <div class="tier-label tier-2-label">
+          Tier-2: Spring Boot<br>Components
+        </div>
+        <div class="components-box">
+          <div class="comp-pill type-owned">spring-boot<br>(Bootstrap)</div>
+          <div class="comp-pill type-owned">spring-boot-<br>autoconfigure</div>
+          <div class="comp-pill type-owned">spring-boot-<br>actuator</div>
+          <div class="comp-pill type-owned">spring-boot-<br>starters</div>
+          <div class="comp-pill ellipsis">...</div>
+          <div class="comp-pill type-owned">spring-boot-<br>loader & plugins</div>
+        </div>
+      </div>
+
+      <!-- Tier 3 -->
+      <div class="tier-row">
+        <div class="tier-label tier-3-label">
+          Tier-3: Eco system Plugins<br>(Open Sources)
+        </div>
+        <div class="components-box">
+          <div class="comp-pill type-3p">Apache Tomcat<br>& Netty</div>
+          <div class="comp-pill type-3p">Jackson &<br>Serialization</div>
+          <div class="comp-pill type-3p">Hibernate ORM<br>& JPA</div>
+          <div class="comp-pill type-3p">Logback &<br>SLF4J</div>
+          <div class="comp-pill ellipsis">...</div>
+          <div class="comp-pill type-3p">Micrometer &<br>HikariCP</div>
+        </div>
+      </div>
+
+      <!-- Tier 4 -->
+      <div class="tier-row">
+        <div class="tier-label tier-4-label">
+          Tier-4: Engineering<br>Tools
+        </div>
+        <div class="components-box">
+          <div class="comp-pill type-3p">Gradle Build<br>Tool (9.8)</div>
+          <div class="comp-pill type-3p">JUnit 5 &<br>AssertJ / Mockito</div>
+          <div class="comp-pill type-3p">Testcontainers<br>(Docker)</div>
+          <div class="comp-pill type-3p">Paketo Cloud<br>Buildpacks</div>
+          <div class="comp-pill ellipsis">...</div>
+          <div class="comp-pill type-3p">CodeQL &<br>Antora Docs</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Legend -->
+    <div class="legend-row">
+      <div class="legend-item">
+        <div class="legend-pill type-owned">Spring Boot Components</div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-pill type-3p">Spring Boot Dependent 3P Components</div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>
